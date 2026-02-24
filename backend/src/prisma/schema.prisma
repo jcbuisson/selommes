@@ -1,0 +1,38 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+   provider = "prisma-client"
+   output   = "../generated/prisma"
+}
+
+datasource db {
+   provider = "postgresql"
+}
+
+model metadata {
+   uid              String     @unique  // `uid` is unique across models
+   created_at       DateTime?
+   updated_at       DateTime?
+   deleted_at       DateTime?
+}
+
+model user {
+   uid             String     @unique
+   name            String
+
+   selections      selection[]
+}
+
+model selection {
+   uid             String     @unique
+   start           String    // yyyy-mm-dd
+   end             String    // yyyy-mm-dd
+   text            String
+   userUid         String
+
+   user            user      @relation(fields: [userUid], references: [uid], onDelete: Cascade)
+}
