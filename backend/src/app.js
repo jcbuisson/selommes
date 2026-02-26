@@ -1,10 +1,9 @@
 import 'dotenv/config'
 import express from 'express'
-import { expressX } from '@jcbuisson/express-x'
+// import { expressX } from '@jcbuisson/express-x'
+import { expressX, reloadPlugin, offlinePlugin } from '#root/src/server.mjs'
 
-import services from './services/index.js'
 import channels from './channels.js'
-import transfer from './transfer.js'
 
 import prisma from './prisma.js'
 
@@ -16,17 +15,17 @@ const app = expressX({
 
 app.set('prisma', prisma)
 
-// services
-app.configure(services)
+// allows socket data & room transfer on page reload
+app.configure(reloadPlugin)
 
-// development only: serve static assets (reports, avatars)
-app.use('/static', express.static('./static'))
+// add offline synchronization service and add database services for models 'user' and 'selection'
+app.configure(offlinePlugin, ['user', 'selection'])
 
 // pub/sub
 app.configure(channels)
 
-// cnx transfer
-app.configure(transfer)
+// development only: serve static assets (reports, avatars)
+app.use('/static', express.static('./static'))
 
 const PORT = process.env.PORT || 3000
 app.httpServer.listen(PORT, () => console.log(`App listening at http://localhost:${PORT}`))

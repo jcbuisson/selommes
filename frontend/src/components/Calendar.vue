@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 
+
 const MONTH_NAMES = [
    'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
    'Juillet', 'Aout', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
