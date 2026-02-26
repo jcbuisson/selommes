@@ -17,11 +17,12 @@ function onSelect({ start, end }) {
 }
 
 async function create() {
-   const uid = uuidv7()
-   const selection = await selectionModel.create(uid, {
+   // const uid = uuidv7()
+   const selection = await selectionModel.create({
       text:'test',
       start: '1962-12-27',
       end: '1962-12-27',
+      userUid: '1234azer',
    })
    console.log('selection', selection)
 }

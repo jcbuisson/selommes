@@ -277,7 +277,7 @@ export function offlinePlugin(app) {
          await db.values.add({ uid, ...data })
          await db.metadata.add({ uid, created_at: now })
          // execute on server, asynchronously, if connection is active
-         if (app.isConnected()) {
+         if (app.isConnected) {
             app.service(modelName).createWithMeta(uid, data, now)
             .catch(async err => {
                console.log(`*** err sync ${modelName} create`, err)
@@ -296,7 +296,7 @@ export function offlinePlugin(app) {
          await db.values.update(uid, data)
          await db.metadata.update(uid, { updated_at: now })
          // execute on server, asynchronously, if connection is active
-         if (app.isConnected()) {
+         if (app.isConnected) {
             app.service(modelName).updateWithMeta(uid, data, now)
             .catch(async err => {
                console.log(`*** err sync ${modelName} update`, err)
@@ -316,7 +316,7 @@ export function offlinePlugin(app) {
          await db.values.update(uid, { __deleted__: true })
          await db.metadata.update(uid, { deleted_at })
          // and in database, if connected
-         if (app.isConnected()) {
+         if (app.isConnected) {
             app.service(modelName).deleteWithMeta(uid, deleted_at)
             .catch(async err => {
                console.log(`*** err sync ${modelName} remove`, err)
@@ -343,7 +343,7 @@ export function offlinePlugin(app) {
       function getObservable(where = {}) {
          addSynchroWhere(where).then((isNew: boolean) => {
             // console.log('getObservable addSynchroWhere', modelName, where, isNew);
-            if (isNew && app.isConnected()) {
+            if (isNew && app.isConnected) {
                synchronize(app, modelName, db.values, db.metadata, where, app.getDisconnectedDate())
             }
          })

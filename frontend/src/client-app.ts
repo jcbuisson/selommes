@@ -37,12 +37,14 @@ app.addConnectListener(async (_socket) => {
    connectedDate.value = new Date()
    console.log('onConnect', connectedDate.value)
    disconnectedDate.value = null
+   app.isConnected = true
 })
 
 app.addDisconnectListener(async (_socket) => {
    connectedDate.value = null
    disconnectedDate.value = new Date()
    console.log('onDisconnect', disconnectedDate.value)
+   app.isConnected = false
 })
 
-export const isConnected = computed(() => !!connectedDate?.value);
+// export const isConnected = computed(() => !!connectedDate?.value);
