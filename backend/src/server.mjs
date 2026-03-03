@@ -15,18 +15,11 @@ import bcrypt from 'bcryptjs'
 
 function truncateString(str, maxLength = 300, ellipsis = '...') {
    // Check if the string already fits
-   if (str.length <= maxLength) {
-      return str;
-   }
-
+   if (str.length <= maxLength) return str;
    // Calculate the cut-off point, accounting for the ellipsis length
    const cutLength = maxLength - ellipsis.length;
-   
    // Ensure the string is long enough to be cut
-   if (cutLength < 0) {
-         return str.substring(0, maxLength); // Just cut it off if ellipsis doesn't fit
-   }
-
+   if (cutLength < 0) return str.substring(0, maxLength); // Just cut it off if ellipsis doesn't fit
    // Truncate the string and add the ellipsis
    return str.substring(0, cutLength) + ellipsis;
 }
@@ -455,13 +448,18 @@ export function offlinePlugin(app, modelNames) {
    const prisma = app.get('prisma');
 
    if (!prisma.metadata) {
-      app.log('error', "A model named 'metadata' is expected in the prisma database - see https://expressx.jcbuisson.dev/server-api.html#offline")
+      app.log('error', "A model named 'metadata' is expected in the prisma schema - see https://expressx.jcbuisson.dev/server-api.html#offline")
       return
    }
 
    // add a database service for each model
    for (const modelName of modelNames) {
       const model = prisma[modelName];
+      
+      if (!model) {
+         app.log('error', `There is no model named '${modelName}}' in the prisma schema`)
+         return
+      }
 
       app.createService(modelName, {
 

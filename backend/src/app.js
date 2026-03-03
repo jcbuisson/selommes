@@ -1,7 +1,7 @@
 import 'dotenv/config'
 import express from 'express'
-// import { expressX } from '@jcbuisson/express-x'
-import { expressX, reloadPlugin, offlinePlugin } from '#root/src/server.mjs'
+import { expressX, reloadPlugin, offlinePlugin } from '@jcbuisson/express-x'
+// import { expressX, reloadPlugin, offlinePlugin } from '#root/src/server.mjs'
 
 import channels from './channels.js'
 

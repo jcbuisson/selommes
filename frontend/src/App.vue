@@ -1,24 +1,25 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { v7 as uuidv7 } from 'uuid'
-import { useObservable } from '@vueuse/rxjs'
-
-import { app, selectionModel } from '/src/client-app.ts';
+// import { useObservable } from '@vueuse/rxjs'
 
 import Calendar from '/src/components/Calendar.vue'
+import Calendar2 from '/src/components/Calendar2.vue'
 
 
-const selections$ = selectionModel.getObservable();
+import useSelection from '/src/use/useSelection';
 
-const selections = useObservable(selections$)
+import { app } from '/src/client-app.ts';
+
+const { getObservable: selections$, create: createSelection } = useSelection(app);
+
+// const selections = useObservable(selections$({}))
+
 
 function onSelect({ start, end }) {
    console.log('Selected range:', start, '→', end)
 }
 
 async function create() {
-   // const uid = uuidv7()
-   const selection = await selectionModel.create({
+   const selection = await createSelection({
       text:'test',
       start: '1962-12-27',
       end: '1962-12-27',
@@ -29,7 +30,8 @@ async function create() {
 </script>
 
 <template>
-   {{ selections }}
+   <!-- {{ selections }} -->
    <Calendar @select="onSelect" />
-   <button @click="create">create</button>
+   <Calendar2 @select="onSelect" />
+   <!-- <button @click="create">create</button> -->
 </template>
