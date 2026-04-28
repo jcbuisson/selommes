@@ -8,9 +8,6 @@ const socketOptions = {
    transports: ["websocket"],
    reconnectionDelay: 1000,
    reconnectionDelayMax: 10000,
-   extraHeaders: {
-      "bearer-token": "mytoken",
-   },
 };
 
 const socket = io(socketOptions);

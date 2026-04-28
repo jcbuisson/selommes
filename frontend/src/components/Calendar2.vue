@@ -13,17 +13,15 @@ const lines = [
 
 <template>
    <div class="calendar">
-      <div class="calendar-line">
-         <div v-for="line, index in lines" :key="index" :class="line.type">
-            <template v-if="line.type === 'day-cell'">
-               <div v-for="cell in line.content">
-                  {{ cell.text }}
-               </div>
-            </template>
-            <template v-else>
-               {{ line.text }}
-            </template>
-         </div>
+      <div v-for="line, index in lines" :key="index" class="calendar-line">
+         <template v-if="line.type === 'day-cell'">
+            <div v-for="cell in line.content" class="day-cell" :class="{ light: cell.light}">
+               {{ cell.text }}
+            </div>
+         </template>
+         <template v-else>
+            {{ line.text }}
+         </template>
       </div>
    </div>
 </template>
@@ -35,25 +33,27 @@ const lines = [
    border-radius: 16px;
    padding: 16px;
    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
-   color: #cdd6f4;
+   color: #253546;
    font-family: inherit;
 }
 
 .calendar-line {
-   /* display: flex; */
+   display: flex;
+   align-items: center;
+   height: 40px;
 }
 
 
 .day-cell {
-   display: flex;
-   /* align-items: center;
-   justify-content: center; */
-   height: 40px;
-   width: 40px;
+   width: 46px;
    font-size: 0.88em;
    border-radius: 8px;
    cursor: pointer;
    transition: background 0.1s;
+}
+
+.light {
+   color: #D2D5DB;
 }
 
 .day-cell:hover {

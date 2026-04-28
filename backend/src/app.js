@@ -3,8 +3,7 @@ import express from 'express'
 import { expressX, reloadPlugin, offlinePlugin } from '@jcbuisson/express-x'
 // import { expressX, reloadPlugin, offlinePlugin } from '#root/src/server.mjs'
 
-import channels from './channels.js'
-
+import publish from './publish.js'
 import prisma from './prisma.js'
 
 
@@ -21,10 +20,14 @@ app.configure(reloadPlugin)
 // add offline synchronization service and add database services for models 'user' and 'selection'
 app.configure(offlinePlugin, ['user', 'selection'])
 
-// pub/sub
-app.configure(channels)
+// publish
+app.configure(publish)
+// subscribe
+app.on('connection', (socket) => {
+   app.joinChannel('anonymous', socket)
+})
 
-// development only: serve static assets (reports, avatars)
+// development only: serve static assets
 app.use('/static', express.static('./static'))
 
 const PORT = process.env.PORT || 3000
