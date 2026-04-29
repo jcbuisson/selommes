@@ -107,6 +107,8 @@ const weekSegments = computed(() =>
             key: r.label + weekDays[0].date.toISOString(),
             label: r.label,
             color: r.color,
+            rangeStart: r.start,
+            rangeEnd:   r.end,
             colStart: firstCol + 1, // CSS grid is 1-based
             colSpan: lastCol - firstCol + 1,
             startsHere: rs >= ws,
@@ -132,6 +134,11 @@ function barStyle(seg) {
       marginLeft:  seg.startsHere ? '2px' : '0',
       marginRight: seg.endsHere   ? '2px' : '0',
    }
+}
+
+function onBarClick(seg) {
+   selectionStart.value = seg.rangeStart
+   selectionEnd.value = seg.rangeEnd
 }
 
 function dayClasses(date) {
@@ -237,6 +244,7 @@ function formatDate(date) {
             :key="seg.key"
             class="range-bar"
             :style="barStyle(seg)"
+            @mousedown.stop="onBarClick(seg)"
          >
             <span v-if="seg.startsHere" class="bar-label">{{ seg.label }}</span>
          </div>
@@ -374,6 +382,7 @@ function formatDate(date) {
    align-items: center;
    overflow: hidden;
    min-width: 0;
+   cursor: pointer;
 }
 
 .bar-label {
