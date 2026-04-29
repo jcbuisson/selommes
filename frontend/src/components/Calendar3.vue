@@ -249,16 +249,6 @@ function formatDate(date) {
             <span v-if="seg.startsHere" class="bar-label">{{ seg.label }}</span>
          </div>
       </div>
-
-      <!-- footer: active drag selection -->
-      <div v-if="activeRange.start" class="selection-info">
-         <template v-if="activeRange.start.getTime() === activeRange.end.getTime()">
-            {{ formatDate(activeRange.start) }}
-         </template>
-         <template v-else>
-            {{ formatDate(activeRange.start) }} &rarr; {{ formatDate(activeRange.end) }}
-         </template>
-      </div>
    </div>
 </template>
 
@@ -395,15 +385,6 @@ function formatDate(date) {
    color: rgba(0, 0, 0, 0.65);
 }
 
-/* ── Footer ── */
-.selection-info {
-   margin-top: 12px;
-   text-align: center;
-   font-size: 0.82em;
-   color: #a6adc8;
-   min-height: 1.2em;
-}
-
 /* ── Light mode ── */
 @media (prefers-color-scheme: light) {
    .calendar {
@@ -445,14 +426,6 @@ function formatDate(date) {
    .day-cell.range-end {
       background: #6366f1;
       color: #ffffff;
-   }
-
-   .selection-info {
-      color: #6b7280;
-   }
-
-   .legend-item {
-      color: #6b7280;
    }
 }
 </style>
