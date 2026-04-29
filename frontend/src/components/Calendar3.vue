@@ -316,6 +316,7 @@ function formatDate(date) {
    display: grid;
    grid-template-columns: repeat(7, 1fr);
    touch-action: none;
+   margin-top: 8px;
 }
 
 /* ── Day cells ── */
