@@ -7,7 +7,7 @@ export default function(app) {
       // 'find' events are not sent to anyone
       if (context.methodName.startsWith('find')) return [];
       
-      return ['everyone']
+      return ['anonymous']
    }
 
    app.service('user').publish(async (context) => {
