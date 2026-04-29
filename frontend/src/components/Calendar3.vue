@@ -1,6 +1,17 @@
 <script setup>
-import { ref, computed } from 'vue'
+/***
+ * Architecture: weekday-labels row + 6 week blocks. Each week block is its own 7-column grid.
+ * Day cells are pinned to grid-row: 1. Range bars have no explicit grid-row, so CSS grid's auto-placement algorithm
+ * packs them into rows 2, 3, … — automatically putting non-overlapping bars on the same row (stacking only when they share columns).
+ * 
+ * Bar segments: for each range × week intersection, the code computes:
+ *    - colStart / colSpan — which cells the bar occupies in that week
+ *    - startsHere / endsHere — whether to round the left/right caps or leave them square for continuity across week breaks
+ * 
+ * Label: shown only on the first segment of a range (startsHere), with text-overflow: ellipsis for narrow bars.  
+*/
 
+import { ref, computed } from 'vue'
 
 const MONTH_NAMES = [
    'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -242,12 +253,12 @@ function formatDate(date) {
       </div>
 
       <!-- legend -->
-      <div v-if="normalizedRanges.length" class="ranges-legend">
+      <!-- <div v-if="normalizedRanges.length" class="ranges-legend">
          <div v-for="r in normalizedRanges" :key="r.label" class="legend-item">
             <span class="legend-swatch" :style="{ background: r.color }" />
             <span class="legend-label">{{ r.label }}</span>
          </div>
-      </div>
+      </div> -->
 
    </div>
 </template>
@@ -394,7 +405,7 @@ function formatDate(date) {
 }
 
 /* ── Legend ── */
-.ranges-legend {
+/* .ranges-legend {
    margin-top: 10px;
    display: flex;
    flex-direction: column;
@@ -418,7 +429,7 @@ function formatDate(date) {
 
 .legend-label {
    line-height: 1;
-}
+} */
 
 /* ── Light mode ── */
 @media (prefers-color-scheme: light) {

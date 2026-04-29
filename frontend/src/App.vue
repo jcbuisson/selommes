@@ -36,7 +36,7 @@ async function create() {
 
 <template>
    {{ selections }}
-   <Calendar @select="onSelect" />
+   <!-- <Calendar @select="onSelect" /> -->
    <Calendar3 :ranges="exampleRanges" @select="onSelect" />
    <!-- <button @click="create">create</button> -->
 </template>
