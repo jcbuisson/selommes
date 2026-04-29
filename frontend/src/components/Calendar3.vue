@@ -251,15 +251,6 @@ function formatDate(date) {
             {{ formatDate(activeRange.start) }} &rarr; {{ formatDate(activeRange.end) }}
          </template>
       </div>
-
-      <!-- legend -->
-      <!-- <div v-if="normalizedRanges.length" class="ranges-legend">
-         <div v-for="r in normalizedRanges" :key="r.label" class="legend-item">
-            <span class="legend-swatch" :style="{ background: r.color }" />
-            <span class="legend-label">{{ r.label }}</span>
-         </div>
-      </div> -->
-
    </div>
 </template>
 
@@ -403,33 +394,6 @@ function formatDate(date) {
    color: #a6adc8;
    min-height: 1.2em;
 }
-
-/* ── Legend ── */
-/* .ranges-legend {
-   margin-top: 10px;
-   display: flex;
-   flex-direction: column;
-   gap: 5px;
-}
-
-.legend-item {
-   display: flex;
-   align-items: center;
-   gap: 7px;
-   font-size: 0.8em;
-   color: #a6adc8;
-}
-
-.legend-swatch {
-   width: 10px;
-   height: 10px;
-   border-radius: 50%;
-   flex-shrink: 0;
-}
-
-.legend-label {
-   line-height: 1;
-} */
 
 /* ── Light mode ── */
 @media (prefers-color-scheme: light) {
