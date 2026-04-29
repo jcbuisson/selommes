@@ -33,6 +33,7 @@ const currentMonth = ref(today.getMonth())
 const selectionStart = ref(null)
 const selectionEnd = ref(null)
 const isDragging = ref(false)
+const dragAnchor = ref(null) // the end that stays fixed during a drag
 
 const monthLabel = computed(() =>
    `${MONTH_NAMES[currentMonth.value]} ${currentYear.value}`
@@ -163,13 +164,25 @@ function nextMonth() {
    else currentMonth.value++
 }
 
-// ── Mouse ──────────────────────────────────────────────────────────────────
+// ── Drag helpers ───────────────────────────────────────────────────────────
+// If the grabbed date is a handle of the current selection, pin the opposite
+// end as the anchor so the user edits just that one side.
+// Otherwise start a fresh selection anchored at the clicked date.
 
-function onMouseDown(date) {
+function startDrag(date) {
    isDragging.value = true
-   selectionStart.value = date
+   const { start, end } = activeRange.value
+   dragAnchor.value =
+      start && date.getTime() === start.getTime() ? end :
+      end   && date.getTime() === end.getTime()   ? start :
+      date
+   selectionStart.value = dragAnchor.value
    selectionEnd.value = date
 }
+
+// ── Mouse ──────────────────────────────────────────────────────────────────
+
+function onMouseDown(date) { startDrag(date) }
 
 function onMouseEnter(date) {
    if (isDragging.value) selectionEnd.value = date
@@ -183,11 +196,7 @@ function onDragEnd() {
 
 // ── Touch ──────────────────────────────────────────────────────────────────
 
-function onTouchStart(date) {
-   isDragging.value = true
-   selectionStart.value = date
-   selectionEnd.value = date
-}
+function onTouchStart(date) { startDrag(date) }
 
 function onTouchMove(event) {
    if (!isDragging.value) return
@@ -352,6 +361,7 @@ function formatDate(date) {
    border-radius: 8px 0 0 8px;
    color: #1e1e2e;
    font-weight: 700;
+   cursor: ew-resize;
 }
 
 .day-cell.range-end {
@@ -359,6 +369,7 @@ function formatDate(date) {
    border-radius: 0 8px 8px 0;
    color: #1e1e2e;
    font-weight: 700;
+   cursor: ew-resize;
 }
 
 .day-cell.range-start.range-end {
