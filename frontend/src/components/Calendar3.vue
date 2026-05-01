@@ -264,9 +264,11 @@ function formatDate(date) {
 <style scoped>
 .calendar {
    user-select: none;
-   width: 320px;
+   width: 100%;
+   box-sizing: border-box;
    background: #1e1e2e;
-   border-radius: 16px;
+   border: 1px solid #313244;
+   border-radius: 0 0 12px 12px;
    padding: 16px;
    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
    color: #cdd6f4;
@@ -402,6 +404,7 @@ function formatDate(date) {
    .calendar {
       background: #ffffff;
       color: #213547;
+      border-color: #e5e7eb;
       box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
    }
 
