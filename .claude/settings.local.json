@@ -3,7 +3,8 @@
     "allow": [
       "Bash(git ls-tree:*)",
       "Bash(git log:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(grep -E \"\\\\.\\(js|ts|sql\\)$\")"
     ]
   }
 }

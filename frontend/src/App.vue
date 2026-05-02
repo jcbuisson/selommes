@@ -2,16 +2,15 @@
 import { useObservable } from '@vueuse/rxjs'
 import { mdiCalendarPlus } from '@mdi/js'
 
-import Calendar from '/src/components/Calendar.vue'
 import Calendar3 from '/src/components/Calendar3.vue'
 
-import useSelection from '/src/use/useSelection';
+import useRange from '/src/use/useRange';
 
 import { app } from '/src/client-app.ts';
 
-const { getObservable: selections$, create: createSelection } = useSelection(app);
+const { getObservable: ranges$, create: createRange } = useRange(app);
 
-const selections = useObservable(selections$({}))
+const ranges = useObservable(ranges$({}))
 
 const exampleRanges = [
    { label: 'Vacances', color: '#f38ba8', start: new Date(2026, 4, 1),  end: new Date(2026, 4, 10) },
@@ -21,6 +20,7 @@ const exampleRanges = [
 
 function onSelect({ start, end }) {
    console.log('Selected range:', start, '→', end)
+   
 }
 
 function onNewRange() {
@@ -28,13 +28,13 @@ function onNewRange() {
 }
 
 async function create() {
-   const selection = await createSelection({
+   const selection = await createRange({
       text: 'test',
       start: '1962-12-27',
       end: '1962-12-27',
       userUid: '1234azer',
    })
-   console.log('selection', selection)
+   console.log('range', range)
 }
 </script>
 
