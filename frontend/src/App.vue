@@ -18,23 +18,14 @@ const exampleRanges = [
    { label: 'Férié',     color: '#fab387', start: new Date(2026, 4, 22), end: new Date(2026, 4, 22) },
 ]
 
-function onSelect({ start, end }) {
-   console.log('Selected range:', start, '→', end)
-   
-}
-
-function onNewRange() {
-   console.log('New range')
-}
-
-async function create() {
-   const selection = await createRange({
-      text: 'test',
-      start: '1962-12-27',
-      end: '1962-12-27',
-      userUid: '1234azer',
-   })
-   console.log('range', range)
+async function onSelect({ start, end }) {
+   console.log('Selected range:', start, '→', end);
+   const range = await createRange({
+      label: "aaa",
+      color: '#f38ba8',
+      start, end,
+   });
+   console.log('range', range);
 }
 </script>
 
