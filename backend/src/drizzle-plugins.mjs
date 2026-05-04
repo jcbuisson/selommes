@@ -64,7 +64,7 @@ export function drizzleOfflinePlugin(app, db, models) {
          // createWithMeta: async (data, created_at) => {
          //    db.transaction(async (tx) => {
          //       const value = await tx.insert(model).values(data).returning();
-         //       const meta = await tx.insert(metadata).values({ uid: value.id, created_at }).returning();
+         //       const meta = await tx.insert(metadata).values({ uid: value.uid, created_at }).returning();
          //       return [value, meta]
          //    })
          // },

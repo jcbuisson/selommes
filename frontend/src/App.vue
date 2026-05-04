@@ -24,6 +24,7 @@ async function onSelect({ start, end }) {
       label: "aaa",
       color: '#f38ba8',
       start, end,
+      user_uid: '90282bfb-64dc-457c-88f8-525b527259e3',
    });
    console.log('range', range);
 }
@@ -40,7 +41,7 @@ async function onSelect({ start, end }) {
          </button>
       </header>
 
-      <Calendar3 :ranges="exampleRanges" @select="onSelect" />
+      <Calendar3 :ranges="ranges" @select="onSelect" />
    </div>
 </template>
 
