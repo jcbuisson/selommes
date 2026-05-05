@@ -24,7 +24,7 @@ app.configure(drizzleOfflinePlugin, db, [
    range,
 ])
 
-// allows socket data & room transfer on page reload
+// preserve socket data & rooms membership on page reload
 app.configure(reloadPlugin)
 
 // publish
