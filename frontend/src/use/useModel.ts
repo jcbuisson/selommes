@@ -2,7 +2,7 @@ import Dexie from "dexie";
 import { from } from 'rxjs';
 import { distinctUntilChanged } from 'rxjs/operators';
 import { liveQuery } from "dexie";
-// uuidv7 are monotonically increasing and improve database performance amid B-tree indexes
+// uuidv7 are monotonically increasing and improve performance with database B-tree indexes
 import { v7 as uuidv7 } from 'uuid';
 import { tryOnScopeDispose } from '@vueuse/core';
 

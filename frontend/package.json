@@ -18,7 +18,8 @@
     "socket.io-client": "^4.8.3",
     "uuid": "^13.0.0",
     "vite-plugin-pwa": "^1.2.0",
-    "vue": "^3.5.25"
+    "vue": "^3.5.25",
+    "vue-router": "^5.0.6"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.2",
