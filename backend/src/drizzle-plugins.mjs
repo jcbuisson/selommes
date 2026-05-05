@@ -31,6 +31,31 @@ class Mutex {
    }
 }
 
+function objectToWhere(table, filters) {
+   const conditions = Object.entries(filters)
+      .filter(([_, value]) => value !== undefined)
+      .map(([key, value]) => eq(table[key], value));
+   return conditions.length ? and(...conditions) : undefined;
+}
+
+function truncateString(str, maxLength = 300, ellipsis = '...') {
+   // Check if the string already fits
+   if (str.length <= maxLength) {
+      return str;
+   }
+
+   // Calculate the cut-off point, accounting for the ellipsis length
+   const cutLength = maxLength - ellipsis.length;
+   
+   // Ensure the string is long enough to be cut
+   if (cutLength < 0) {
+         return str.substring(0, maxLength); // Just cut it off if ellipsis doesn't fit
+   }
+
+   // Truncate the string and add the ellipsis
+   return str.substring(0, cutLength) + ellipsis;
+}
+
 //////////////////////////       DRIZZLE OFFLINE PLUGIN       //////////////////////////
 
 const mutex = new Mutex()
@@ -44,13 +69,12 @@ export function drizzleOfflinePlugin(app, db, models) {
       app.createService(modelName, {
 
          findUnique: async (where) => {
-            const filters = Object.entries(where).map(([key, value]) => eq(model[key], value));
-            return await db.query[model].findFirst({ where: and(...filters) });
+            const rows = await db.select().from(model).where(objectToWhere(model, where));
+            return rows[0] ?? null;
          },
 
          findMany: async (where) => {
-            const filters = Object.entries(where).map(([key, value]) => eq(model[key], value));
-            return await db.query[model].findMany({ where: and(...filters) });
+            return await db.select().from(model).where(objectToWhere(model, where));
          },
          
          createWithMeta: async (uid, data, created_at) => {
@@ -96,10 +120,9 @@ export function drizzleOfflinePlugin(app, db, models) {
          try {
             console.log('>>>>> SYNC', modelName, where, cutoffDate)
             const databaseService = app.service(modelName)
-            const prisma = app.get('prisma')
       
             // STEP 1: get existing database `where` values
-            const databaseValues = await databaseService.findMany({ where })
+            const databaseValues = await databaseService.findMany(where)
          
             const databaseValuesDict = databaseValues.reduce((accu, value) => {
                accu[value.uid] = value
@@ -143,11 +166,8 @@ export function drizzleOfflinePlugin(app, db, models) {
          
             for (const uid of onlyDatabaseIds) {
                const databaseValue = databaseValuesDict[uid]
-               let databaseMetaData = await prisma.metadata.findUnique({ where: { uid }})
-               if (!databaseMetaData) {
-                  console.log('no metadata - should not happen', modelName, where, uid)
-                  databaseMetaData = { uid, created_at: new Date() }
-               }
+               const databaseMetaData = (await db.select().from(metadata).where(eq(metadata.uid, uid)))[0]
+                  || { uid, created_at: new Date() } // should not happen
                addClient.push([databaseValue, databaseMetaData])
             }
          
@@ -170,7 +190,7 @@ export function drizzleOfflinePlugin(app, db, models) {
                   deleteDatabase.push(uid)
                   deleteClient.push([uid, clientMetaData.deleted_at])
                } else {
-                  const databaseMetaData = await prisma.metadata.findUnique({ where: { uid }})
+                  const databaseMetaData = (await db.select().from(metadata).where(eq(metadata.uid, uid)))[0]
                      || { uid, created_at: new Date() } // should not happen
                   const clientUpdatedAt = new Date(clientMetaData.updated_at || clientMetaData.created_at)
                   const databaseUpdatedAt = new Date(databaseMetaData.updated_at || databaseMetaData.created_at)

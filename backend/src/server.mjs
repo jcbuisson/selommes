@@ -24,7 +24,6 @@ function truncateString(str, maxLength = 300, ellipsis = '...') {
    return str.substring(0, cutLength) + ellipsis;
 }
 
-
 class Mutex {
    constructor() {
       this.locked = false;
