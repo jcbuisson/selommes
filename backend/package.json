@@ -32,12 +32,15 @@
     "test": ""
   },
   "dependencies": {
-    "@jcbuisson/express-x": "^3.0.2",
+    "@jcbuisson/express-x": "^3.0.3",
+    "@jcbuisson/express-x-drizzle": "^1.0.3",
     "@prisma/adapter-pg": "^7.4.1",
     "@prisma/client": "^7.4.1",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "express": "^5.2.1",
+    "express-x-drizzle": "^1.0.1",
+    "express-x-prisma": "^1.0.1",
     "pg": "^8.20.0",
     "prisma": "^7.4.1"
   },

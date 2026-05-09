@@ -3,64 +3,24 @@ import { createServer } from "http"
 import { Server } from "socket.io"
 import bcrypt from 'bcryptjs'
 
-import { metadata } from '#root/src/db/schema.js';
 import { and, eq, getTableName } from "drizzle-orm";
+
+import { metadata } from '#root/src/db/schema.js';
+import { Mutex, truncateString } from '@jcbuisson/express-x'
+
 
 //////////////////////////       UTILITIES       //////////////////////////
 
-class Mutex {
-   constructor() {
-      this.locked = false;
-      this.queue = [];
-   }
-
-   async acquire() {
-      if (this.locked) {
-         return new Promise(resolve => this.queue.push(resolve));
-      }
-      this.locked = true;
-   }
-
-   release() {
-      if (this.queue.length > 0) {
-         const next = this.queue.shift();
-         next();
-      } else {
-         this.locked = false;
-      }
-   }
-}
-
-function objectToWhere(table, filters) {
+function whereToDrizzleFilters(table, filters) {
    const conditions = Object.entries(filters)
       .filter(([_, value]) => value !== undefined)
       .map(([key, value]) => eq(table[key], value));
    return conditions.length ? and(...conditions) : undefined;
 }
 
-function truncateString(str, maxLength = 300, ellipsis = '...') {
-   // Check if the string already fits
-   if (str.length <= maxLength) {
-      return str;
-   }
+//////////////////////////       DRIZZLE CRUD DATABSE PLUGIN       //////////////////////////
 
-   // Calculate the cut-off point, accounting for the ellipsis length
-   const cutLength = maxLength - ellipsis.length;
-   
-   // Ensure the string is long enough to be cut
-   if (cutLength < 0) {
-         return str.substring(0, maxLength); // Just cut it off if ellipsis doesn't fit
-   }
-
-   // Truncate the string and add the ellipsis
-   return str.substring(0, cutLength) + ellipsis;
-}
-
-//////////////////////////       DRIZZLE OFFLINE PLUGIN       //////////////////////////
-
-const mutex = new Mutex()
-
-export function drizzleOfflinePlugin(app, db, models) {
+export function drizzleDatabasePlugin(app, db, models) {
 
    // add a database service for each model
    for (const model of models) {
@@ -69,12 +29,47 @@ export function drizzleOfflinePlugin(app, db, models) {
       app.createService(modelName, {
 
          findUnique: async (where) => {
-            const rows = await db.select().from(model).where(objectToWhere(model, where));
+            const rows = await db.select().from(model).where(whereToDrizzleFilters(model, where));
             return rows[0] ?? null;
          },
 
          findMany: async (where) => {
-            return await db.select().from(model).where(objectToWhere(model, where));
+            return await db.select().from(model).where(whereToDrizzleFilters(model, where));
+         },
+
+         create: async (data) => {
+            return await db.insert(model).values(data).returning();
+         },
+
+         update: async (uid, data) => {
+            return await db.update(model).where(eq(model.uid, uid)).values(data).returning();
+         },
+
+         remove: async (uid) => {
+            return await db.delete(model).where(eq(model.uid, uid)).returning();
+         }
+      })
+   }
+}
+
+
+//////////////////////////       DRIZZLE OFFLINE PLUGIN       //////////////////////////
+
+export function drizzleOfflinePlugin(app, db, metadata, models) {
+
+   // add a database service for each model
+   for (const model of models) {
+      const modelName = getTableName(model)
+
+      app.createService(modelName, {
+
+         findUnique: async (where) => {
+            const rows = await db.select().from(model).where(whereToDrizzleFilters(model, where));
+            return rows[0] ?? null;
+         },
+
+         findMany: async (where) => {
+            return await db.select().from(model).where(whereToDrizzleFilters(model, where));
          },
          
          createWithMeta: async (uid, data, created_at) => {
@@ -103,12 +98,14 @@ export function drizzleOfflinePlugin(app, db, models) {
       })
    }
 
+   const syncMutex = new Mutex()
+
    // add a synchronization service
    app.createService('sync', {
 
       // AMÉLIORER : ne pas avoir une exclusion mutuelle globale, mais seulement par model/where
       go: async (modelName, where, cutoffDate, clientMetadataDict) => {
-         await mutex.acquire()
+         await syncMutex.acquire()
          try {
             console.log('>>>>> SYNC', modelName, where, cutoffDate)
             const databaseService = app.service(modelName)
@@ -211,7 +208,7 @@ export function drizzleOfflinePlugin(app, db, models) {
             }
          
             // STEP5: return to client the changes to perform on its cache, and create/update to perform on database with full data
-            // database creations & updates are done later by the client with complete data (this function only has client values's meta-data)
+            // Database creations & updates are done later by the client with complete data (this function only has client values's meta-data)
             return {
                toAdd: addClient,
                toUpdate: updateClient,
@@ -223,10 +220,9 @@ export function drizzleOfflinePlugin(app, db, models) {
          } catch(err) {
             console.log('*** err sync', err)
          } finally {
-            mutex.release()
+            syncMutex.release()
          }
       },
    })
 
 }
-

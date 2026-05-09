@@ -3,13 +3,13 @@ import express from 'express'
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { eq } from 'drizzle-orm';
 
-// import { expressX, reloadPlugin, offlinePlugin } from '@jcbuisson/express-x'
-import { expressX, reloadPlugin } from '#root/src/server.mjs'
-// import { drizzleOfflinePlugin } from '@jcbuisson/express-x/drizzle'
-import { drizzleOfflinePlugin } from '#root/src/drizzle-plugins.mjs'
+import { expressX, reloadPlugin } from '@jcbuisson/express-x'
+// import { expressX, reloadPlugin } from '#root/src/server.mjs'
+// import { drizzleDatabasePlugin, drizzleOfflinePlugin } from '@jcbuisson/express-x-drizzle'
+import { drizzleDatabasePlugin, drizzleOfflinePlugin } from '#root/src/drizzle-plugins.mjs'
 
 import publish from './publish.js'
-import { user, range } from '#root/src/db/schema.js';
+import { metadata, user, range } from '#root/src/db/schema.js';
 
 const app = expressX({
    WS_TRANSPORT: true,
@@ -19,10 +19,8 @@ const app = expressX({
 const db = drizzle(process.env.DATABASE_URL);
 
 // add offline synchronization and database services for models 'user' and 'range'
-app.configure(drizzleOfflinePlugin, db, [
-   user,
-   range,
-])
+app.configure(drizzleOfflinePlugin, db, metadata, [ user, range ])
+// app.configure(drizzleDatabasePlugin, db, [ user, range ])
 
 // preserve socket data & rooms membership on page reload
 app.configure(reloadPlugin)

@@ -13,7 +13,7 @@ import bcrypt from 'bcryptjs'
 
 //////////////////////////       UTILITIES       //////////////////////////
 
-function truncateString(str, maxLength = 300, ellipsis = '...') {
+export function truncateString(str, maxLength = 300, ellipsis = '...') {
    // Check if the string already fits
    if (str.length <= maxLength) return str;
    // Calculate the cut-off point, accounting for the ellipsis length
@@ -24,7 +24,7 @@ function truncateString(str, maxLength = 300, ellipsis = '...') {
    return str.substring(0, cutLength) + ellipsis;
 }
 
-class Mutex {
+export class Mutex {
    constructor() {
       this.locked = false;
       this.queue = [];

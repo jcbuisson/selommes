@@ -1,6 +1,6 @@
 import { io } from "socket.io-client";
-import { createClient, reloadPlugin, offlinePlugin } from "@jcbuisson/express-x-client";
-// import { createClient, reloadPlugin, offlinePlugin } from "/src/client.mts";
+// import { createClient, reloadPlugin, offlinePlugin, databasePlugin } from "@jcbuisson/express-x-client";
+import { createClient, reloadPlugin, offlinePlugin, databasePlugin } from "/src/client.mts";
 
 
 const socketOptions = {
@@ -17,4 +17,4 @@ export const app = createClient(socket, { debug: true });
 app.configure(reloadPlugin);
 
 app.configure(offlinePlugin);
-
+// app.configure(databasePlugin);

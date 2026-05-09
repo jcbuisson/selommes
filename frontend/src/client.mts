@@ -207,8 +207,102 @@ export async function reloadPlugin(app) {
 }
 
 
-//////////////////////////       OFFLINE PLUGIN       //////////////////////////
-// enrich `app` with methods, attributes and listeners to handle offline-first database access
+//////////////////////////       DATABASE PLUGIN       //////////////////////////
+// Enrich `app` with methods, attributes and listeners to handle crud database access
+
+export function databasePlugin(app) {
+
+   function createModel(modelName, primaryField, fields) {
+
+      const dbName = modelName;
+      const db = getOrCreateDB(dbName, primaryField, fields);
+
+      const reset = async () => {
+         console.log('reset', modelName);
+         await db.values.clear();
+      };
+
+      const create = async (data) => {
+         const value = await app.service(modelName).create(data);
+         // update cache
+         db.values.put[value[primaryField]] = value;
+         return value;
+      }
+
+      const update = async (uid, data) => {
+         const value = await app.service(modelName).update(uid, data);
+         // update cache
+         db.values.put[value[primaryField]] = value;
+         return value;
+      }
+
+      const remove = async (uid) => {
+         const value = await app.service(modelName).remove(uid);
+         // update cache
+         db.values.delete(uid);
+         return value;
+      }
+
+
+      /////////////          PUB / SUB          /////////////
+
+      app.service(modelName).on('create', async (value) => {
+         console.log(`${modelName} EVENT create`, value);
+         await db.values.put(value);
+      });
+
+      app.service(modelName).on('update', async (value) => {
+         console.log(`${modelName} EVENT update`, value);
+         await db.values.put(value);
+      });
+
+      app.service(modelName).on('delete', async (value) => {
+         console.log(`${modelName} EVENT delete`, value);
+         await db.values.delete(value[primaryField]);
+      });
+
+      /////////////          REAL-TIME OBSERVABLE          /////////////
+
+      function getObservable(where = {}) {
+         const predicate = wherePredicate(where)
+         return from(liveQuery(() => db.values.filter(value => predicate(value)).toArray())).pipe(
+            distinctUntilChanged((prev, curr) => {
+               // Deep equality check to prevent unnecessary emissions (in particular on database write)
+               return JSON.stringify(prev) === JSON.stringify(curr)
+            })
+         )
+      }
+
+      return {
+         db, reset,
+         create, update, remove,
+         getObservable,
+      }
+   }
+
+   // Singleton map to reuse Dexie instances per database name
+   const dbInstances = new Map();
+
+   function getOrCreateDB(dbName: string, primaryField: string, fields: string[]) {
+      if (!dbInstances.has(dbName)) {
+         const db = new Dexie(dbName);
+         db.version(1).stores({
+            values: [primaryField, ...fields].join(','),
+         });
+         dbInstances.set(dbName, db);
+      }
+      return dbInstances.get(dbName);
+   }
+
+   // enrich `app` with new methods and attributes
+   return Object.assign(app, {
+      createModel,
+   })
+}
+
+
+//////////////////////////       CRUD OFFLINE PLUGIN       //////////////////////////
+// Enrich `app` with methods, attributes and listeners to handle offline-first crud database access
 
 export function offlinePlugin(app) {
 
@@ -216,14 +310,6 @@ export function offlinePlugin(app) {
 
       const dbName = modelName;
       const db = getOrCreateDB(dbName, fields);
-
-      db.open().then(() => {
-         // console.log('db ready', dbName, modelName)
-      });
-
-      db.values.hook("updating", (changes, primaryKey, previousValue) => {
-         // console.log("CHANGES", primaryKey, changes, previousValue);
-      });
 
       const reset = async () => {
          console.log('reset', modelName);
@@ -257,6 +343,7 @@ export function offlinePlugin(app) {
       /////////////          CREATE/UPDATE/REMOVE          /////////////
 
       async function create(data) {
+         // in offline-first context, uid is created client-side, since server may not be accessible
          const uid = uuidv7()
          // optimistic update
          const now = new Date()
@@ -491,30 +578,20 @@ export function offlinePlugin(app) {
       }
    }
 
-   function wherePredicate(where) {
-      return (elt) => {
-         for (const [attr, value] of Object.entries(where)) {
-            const eltAttrValue = elt[attr]
+   // Singleton map to reuse Dexie instances per database name
+   const dbInstances = new Map();
 
-            if (typeof(value) === 'string' || typeof(value) === 'number') {
-               // 'attr = value' clause
-               if (eltAttrValue !== value) return false
-
-            } else if (typeof(value) === 'object') {
-               // 'attr = { lt/lte/gt/gte: value }' clause
-               if (value.lte) {
-                  if (eltAttrValue > value.lte) return false
-               } else if (value.lt) {
-                  if (eltAttrValue >= value.lt) return false
-               } else if (value.gte) {
-                  if (eltAttrValue < value.gte) return false
-               } else if (value.gt) {
-                  if (eltAttrValue <= value.gt) return false
-               }
-            }
-         }
-         return true
+   function getOrCreateDB(dbName: string, fields: string[]) {
+      if (!dbInstances.has(dbName)) {
+         const db = new Dexie(dbName);
+         db.version(1).stores({
+            whereList: "sortedjson",
+            values: ['uid', '__deleted__', ...fields].join(','),
+            metadata: "uid, created_at, updated_at, deleted_at",
+         });
+         dbInstances.set(dbName, db);
       }
+      return dbInstances.get(dbName);
    }
 
    async function getWhereList(whereDb) {
@@ -559,22 +636,6 @@ export function offlinePlugin(app) {
       }
    }
 
-   // Singleton map to reuse Dexie instances per database name
-   const dbInstances = new Map();
-
-   function getOrCreateDB(dbName: string, fields: string[]) {
-      if (!dbInstances.has(dbName)) {
-         const db = new Dexie(dbName);
-         db.version(1).stores({
-            whereList: "sortedjson",
-            values: ['uid', '__deleted__', ...fields].join(','),
-            metadata: "uid, created_at, updated_at, deleted_at",
-         });
-         dbInstances.set(dbName, db);
-      }
-      return dbInstances.get(dbName);
-   }
-
    // enrich `app` with new methods and attributes
    return Object.assign(app, {
       createOfflineModel,
@@ -594,7 +655,6 @@ function generateUID(length) {
    }
    return uid
 }
-
 
 function stringifyWithSortedKeys(obj, space = null) {
    return JSON.stringify(obj, (key, value) => {
@@ -637,6 +697,32 @@ export class Mutex {
    }
 }
 
+function wherePredicate(where) {
+   return (elt) => {
+      for (const [attr, value] of Object.entries(where)) {
+         const eltAttrValue = elt[attr]
+
+         if (typeof(value) === 'string' || typeof(value) === 'number') {
+            // 'attr = value' clause
+            if (eltAttrValue !== value) return false
+
+         } else if (typeof(value) === 'object') {
+            // 'attr = { lt/lte/gt/gte: value }' clause
+            if (value.lte) {
+               if (eltAttrValue > value.lte) return false
+            } else if (value.lt) {
+               if (eltAttrValue >= value.lt) return false
+            } else if (value.gte) {
+               if (eltAttrValue < value.gte) return false
+            } else if (value.gt) {
+               if (eltAttrValue <= value.gt) return false
+            }
+         }
+      }
+      return true
+   }
+}
+
 function isSubset(subset, fullObject) {
    // return Object.entries(subset).some(([key, value]) => fullObject[key] === value)
    for (const key in fullObject) {
@@ -654,4 +740,3 @@ function isSubsetAmong(subset, fullObjectList) {
    return fullObjectList.some(fullObject => isSubset(subset, fullObject));
 }
 // console.log('isSubsetAmong({a: 1, b: 2}, [{c: 3}, {b: 2}])=true', isSubsetAmong({a: 1, b: 2}, [{c: 3}, {b: 2}]))
-
