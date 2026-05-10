@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useObservable } from '@vueuse/rxjs'
-import { mdiCalendarPlus } from '@mdi/js'
+import { mdiCalendarPlus, mdiDelete } from '@mdi/js'
 
 import Calendar3 from '/src/components/Calendar3.vue'
 
@@ -9,13 +9,14 @@ import useRange from '/src/use/useRange';
 
 import { app } from '/src/client-app.ts';
 
-const { getObservable: ranges$, create: createRange, update: updateRange } = useRange(app);
+const { getObservable: ranges$, create: createRange, update: updateRange, remove: removeRange } = useRange(app);
 
 const ranges = useObservable(ranges$({}))
 
 const showModal = ref(false)
 const pendingRange = ref(null)
 const labelInput = ref('')
+const selectedRangeUid = ref(null)
 
 function onSelect({ start, end }) {
    pendingRange.value = { start, end }
@@ -42,12 +43,23 @@ function cancelCreate() {
 async function onUpdate({ uid, start, end }) {
    await updateRange(uid, { start, end })
 }
+
+async function deleteSelectedRange() {
+   if (!selectedRangeUid.value) return
+   await removeRange(selectedRangeUid.value)
+   selectedRangeUid.value = null
+}
 </script>
 
 <template>
    <div class="app-wrapper">
       <header class="topbar">
          <span class="topbar-title">Selommes</span>
+         <button v-if="selectedRangeUid" class="topbar-btn topbar-btn--danger" title="Supprimer la plage" @click="deleteSelectedRange">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+               <path :d="mdiDelete" fill="currentColor" />
+            </svg>
+         </button>
          <button class="topbar-btn" title="Nouvelle plage" @click="onNewRange">
             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                <path :d="mdiCalendarPlus" fill="currentColor" />
@@ -55,7 +67,7 @@ async function onUpdate({ uid, start, end }) {
          </button>
       </header>
 
-      <Calendar3 :ranges="ranges" @select="onSelect" @update="onUpdate" />
+      <Calendar3 :ranges="ranges" @select="onSelect" @update="onUpdate" @range-selected="uid => selectedRangeUid = uid" />
 
       <div v-if="showModal" class="modal-backdrop" @click.self="cancelCreate">
          <div class="modal">
@@ -124,6 +136,11 @@ async function onUpdate({ uid, start, end }) {
 .topbar-btn:hover {
    background: #45475a;
    border-color: #89b4fa;
+}
+
+.topbar-btn--danger:hover {
+   border-color: #f38ba8;
+   color: #f38ba8;
 }
 
 .topbar-btn svg {

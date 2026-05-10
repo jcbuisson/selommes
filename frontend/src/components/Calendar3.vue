@@ -24,7 +24,7 @@ const props = defineProps({
    ranges: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['select', 'update'])
+const emit = defineEmits(['select', 'update', 'range-selected'])
 
 const today = new Date()
 const currentYear = ref(today.getFullYear())
@@ -143,6 +143,7 @@ function onBarClick(seg) {
    selectionStart.value = seg.rangeStart
    selectionEnd.value = seg.rangeEnd
    selectedRangeUid.value = seg.uid
+   emit('range-selected', seg.uid)
 }
 
 function dayClasses(date) {
@@ -176,7 +177,10 @@ function startDrag(date) {
    isDragging.value = true
    const { start, end } = activeRange.value
    const isHandle = (start && date.getTime() === start.getTime()) || (end && date.getTime() === end.getTime())
-   if (!isHandle) selectedRangeUid.value = null
+   if (!isHandle) {
+      selectedRangeUid.value = null
+      emit('range-selected', null)
+   }
    dragAnchor.value =
       start && date.getTime() === start.getTime() ? end :
       end   && date.getTime() === end.getTime()   ? start :
