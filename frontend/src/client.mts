@@ -306,6 +306,8 @@ export function databasePlugin(app) {
 
 export function offlinePlugin(app) {
 
+   const modelSyncFunctions = []
+
    function createOfflineModel(modelName, fields) {
 
       const dbName = modelName;
@@ -455,6 +457,8 @@ export function offlinePlugin(app) {
          }
       })
 
+      modelSyncFunctions.push(synchronizeAll)
+
       return {
          db, reset,
          create, update, remove,
@@ -468,8 +472,11 @@ export function offlinePlugin(app) {
    app.addConnectListener(async (_socket) => {
       app.connectedDate = new Date()
       console.log('onConnect', app.connectedDate)
-      app.disconnectedDate = null
       app.isConnected = true
+      if (app.disconnectedDate) {
+         modelSyncFunctions.forEach(sync => sync())
+      }
+      app.disconnectedDate = null
    })
 
    app.addDisconnectListener(async (_socket) => {
