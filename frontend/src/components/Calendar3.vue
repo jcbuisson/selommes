@@ -24,7 +24,7 @@ const props = defineProps({
    ranges: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['select'])
+const emit = defineEmits(['select', 'update'])
 
 const today = new Date()
 const currentYear = ref(today.getFullYear())
@@ -34,6 +34,7 @@ const selectionStart = ref(null)
 const selectionEnd = ref(null)
 const isDragging = ref(false)
 const dragAnchor = ref(null) // the end that stays fixed during a drag
+const selectedRangeUid = ref(null) // uid of the range being edited, null for a fresh selection
 
 const monthLabel = computed(() =>
    `${MONTH_NAMES[currentMonth.value]} ${currentYear.value}`
@@ -106,6 +107,7 @@ const weekSegments = computed(() =>
 
          segs.push({
             key: r.label + weekDays[0].date.toISOString(),
+            uid: r.uid,
             label: r.label,
             color: r.color,
             rangeStart: r.start,
@@ -140,6 +142,7 @@ function barStyle(seg) {
 function onBarClick(seg) {
    selectionStart.value = seg.rangeStart
    selectionEnd.value = seg.rangeEnd
+   selectedRangeUid.value = seg.uid
 }
 
 function dayClasses(date) {
@@ -172,6 +175,8 @@ function nextMonth() {
 function startDrag(date) {
    isDragging.value = true
    const { start, end } = activeRange.value
+   const isHandle = (start && date.getTime() === start.getTime()) || (end && date.getTime() === end.getTime())
+   if (!isHandle) selectedRangeUid.value = null
    dragAnchor.value =
       start && date.getTime() === start.getTime() ? end :
       end   && date.getTime() === end.getTime()   ? start :
@@ -191,7 +196,12 @@ function onMouseEnter(date) {
 function onDragEnd() {
    if (!isDragging.value) return
    isDragging.value = false
-   if (activeRange.value.start) emit('select', { start: activeRange.value.start, end: activeRange.value.end })
+   if (!activeRange.value.start) return
+   if (selectedRangeUid.value) {
+      emit('update', { uid: selectedRangeUid.value, start: activeRange.value.start, end: activeRange.value.end })
+   } else {
+      emit('select', { start: activeRange.value.start, end: activeRange.value.end })
+   }
 }
 
 // ── Touch ──────────────────────────────────────────────────────────────────

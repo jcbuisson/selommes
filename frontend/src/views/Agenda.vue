@@ -9,7 +9,7 @@ import useRange from '/src/use/useRange';
 
 import { app } from '/src/client-app.ts';
 
-const { getObservable: ranges$, create: createRange } = useRange(app);
+const { getObservable: ranges$, create: createRange, update: updateRange } = useRange(app);
 
 const ranges = useObservable(ranges$({}))
 
@@ -38,6 +38,10 @@ function cancelCreate() {
    showModal.value = false
    pendingRange.value = null
 }
+
+async function onUpdate({ uid, start, end }) {
+   await updateRange(uid, { start, end })
+}
 </script>
 
 <template>
@@ -51,7 +55,7 @@ function cancelCreate() {
          </button>
       </header>
 
-      <Calendar3 :ranges="ranges" @select="onSelect" />
+      <Calendar3 :ranges="ranges" @select="onSelect" @update="onUpdate" />
 
       <div v-if="showModal" class="modal-backdrop" @click.self="cancelCreate">
          <div class="modal">
