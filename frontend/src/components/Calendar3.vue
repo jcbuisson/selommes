@@ -225,6 +225,14 @@ function onTouchMove(event) {
 function formatDate(date) {
    return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 }
+
+function clearSelection() {
+   selectionStart.value = null
+   selectionEnd.value = null
+   selectedRangeUid.value = null
+}
+
+defineExpose({ clearSelection })
 </script>
 
 <template>

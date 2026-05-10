@@ -17,6 +17,7 @@ const showModal = ref(false)
 const pendingRange = ref(null)
 const labelInput = ref('')
 const selectedRangeUid = ref(null)
+const calendarRef = ref(null)
 
 function onSelect({ start, end }) {
    pendingRange.value = { start, end }
@@ -48,6 +49,7 @@ async function deleteSelectedRange() {
    if (!selectedRangeUid.value) return
    await removeRange(selectedRangeUid.value)
    selectedRangeUid.value = null
+   calendarRef.value?.clearSelection()
 }
 </script>
 
@@ -67,7 +69,7 @@ async function deleteSelectedRange() {
          </button>
       </header>
 
-      <Calendar3 :ranges="ranges" @select="onSelect" @update="onUpdate" @range-selected="uid => selectedRangeUid = uid" />
+      <Calendar3 ref="calendarRef" :ranges="ranges" @select="onSelect" @update="onUpdate" @range-selected="uid => selectedRangeUid = uid" />
 
       <div v-if="showModal" class="modal-backdrop" @click.self="cancelCreate">
          <div class="modal">
