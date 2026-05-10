@@ -1,6 +1,8 @@
 
 import { createRouter, createWebHistory } from 'vue-router'
+
 import Agenda from '/src/views/Agenda.vue'
+
 
 const routes = [
    {

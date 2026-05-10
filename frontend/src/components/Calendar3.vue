@@ -144,6 +144,7 @@ function onBarClick(seg) {
    selectionEnd.value = seg.rangeEnd
    selectedRangeUid.value = seg.uid
    emit('range-selected', seg.uid)
+   isDragging.value = true
 }
 
 function dayClasses(date) {
