@@ -222,6 +222,18 @@ export function databasePlugin(app) {
          await db.values.clear();
       };
 
+      /////////////          REAL-TIME OBSERVABLE          /////////////
+
+      function getObservable(where = {}) {
+         const predicate = wherePredicate(where)
+         return from(liveQuery(() => db.values.filter(value => predicate(value)).toArray())).pipe(
+            distinctUntilChanged((prev, curr) => {
+               // Deep equality check to prevent unnecessary emissions (in particular on database write)
+               return JSON.stringify(prev) === JSON.stringify(curr)
+            })
+         )
+      }
+
       const create = async (data) => {
          const value = await app.service(modelName).create(data);
          // update cache
@@ -260,18 +272,6 @@ export function databasePlugin(app) {
          console.log(`${modelName} EVENT delete`, value);
          await db.values.delete(value[primaryField]);
       });
-
-      /////////////          REAL-TIME OBSERVABLE          /////////////
-
-      function getObservable(where = {}) {
-         const predicate = wherePredicate(where)
-         return from(liveQuery(() => db.values.filter(value => predicate(value)).toArray())).pipe(
-            distinctUntilChanged((prev, curr) => {
-               // Deep equality check to prevent unnecessary emissions (in particular on database write)
-               return JSON.stringify(prev) === JSON.stringify(curr)
-            })
-         )
-      }
 
       return {
          db, reset,
@@ -415,7 +415,6 @@ export function offlinePlugin(app) {
 
       function getObservable(where = {}) {
          addSynchroWhere(where).then((isNew: boolean) => {
-            // console.log('getObservable addSynchroWhere', modelName, where, isNew);
             if (isNew && app.isConnected) {
                synchronize(modelName, db.values, db.metadata, where, app.disconnectedDate)
             }

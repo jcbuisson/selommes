@@ -18,39 +18,39 @@ function whereToDrizzleFilters(table, filters) {
    return conditions.length ? and(...conditions) : undefined;
 }
 
-//////////////////////////       DRIZZLE CRUD DATABSE PLUGIN       //////////////////////////
+// //////////////////////////       DRIZZLE CRUD DATABSE PLUGIN       //////////////////////////
 
-export function drizzleDatabasePlugin(app, db, models) {
+// export function drizzleDatabasePlugin(app, db, models) {
 
-   // add a database service for each model
-   for (const model of models) {
-      const modelName = getTableName(model)
+//    // add a database service for each model
+//    for (const model of models) {
+//       const modelName = getTableName(model)
 
-      app.createService(modelName, {
+//       app.createService(modelName, {
 
-         findUnique: async (where) => {
-            const rows = await db.select().from(model).where(whereToDrizzleFilters(model, where));
-            return rows[0] ?? null;
-         },
+//          findUnique: async (where) => {
+//             const rows = await db.select().from(model).where(whereToDrizzleFilters(model, where));
+//             return rows[0] ?? null;
+//          },
 
-         findMany: async (where) => {
-            return await db.select().from(model).where(whereToDrizzleFilters(model, where));
-         },
+//          findMany: async (where) => {
+//             return await db.select().from(model).where(whereToDrizzleFilters(model, where));
+//          },
 
-         create: async (data) => {
-            return await db.insert(model).values(data).returning();
-         },
+//          create: async (data) => {
+//             return await db.insert(model).values(data).returning();
+//          },
 
-         update: async (uid, data) => {
-            return await db.update(model).where(eq(model.uid, uid)).values(data).returning();
-         },
+//          update: async (uid, data) => {
+//             return await db.update(model).where(eq(model.uid, uid)).values(data).returning();
+//          },
 
-         remove: async (uid) => {
-            return await db.delete(model).where(eq(model.uid, uid)).returning();
-         }
-      })
-   }
-}
+//          remove: async (uid) => {
+//             return await db.delete(model).where(eq(model.uid, uid)).returning();
+//          }
+//       })
+//    }
+// }
 
 
 //////////////////////////       DRIZZLE OFFLINE PLUGIN       //////////////////////////
