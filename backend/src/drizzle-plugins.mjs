@@ -11,12 +11,16 @@ import { Mutex, truncateString } from '@jcbuisson/express-x'
 
 //////////////////////////       UTILITIES       //////////////////////////
 
-function whereToDrizzleFilters(table, filters) {
-   const conditions = Object.entries(filters)
+function whereToDrizzleFilters(table, where) {
+   const conditions = Object.entries(where)
       .filter(([_, value]) => value !== undefined)
       .map(([key, value]) => eq(table[key], value));
    return conditions.length ? and(...conditions) : undefined;
 }
+
+
+// DOIT PERMETTRE L'ARRÊT / REPRISE DU SERVEUR (PAS SEULEMENT LA PERTE DE RÉSEAU)
+// DOIT FAIRE UN ROLLBACK EN CAS D'ERREUR SERVEUR (EX: ERREUR SÉMANTIQUE TYPE PB CLÉ ÉTRANGÈRE OU AUTRE)
 
 
 //////////////////////////       DRIZZLE OFFLINE PLUGIN       //////////////////////////
@@ -64,14 +68,20 @@ export function drizzleOfflinePlugin(app, db, metadata, models) {
       })
    }
 
-   const syncMutex = new Mutex()
+   const syncMutexes = new Map()
 
    // add a synchronization service
    app.createService('sync', {
 
-      // AMÉLIORER : ne pas avoir une exclusion mutuelle globale, mais seulement par model/where
+      // CUTOFFDATE INUTILE ?
       go: async (modelName, where, cutoffDate, clientMetadataDict) => {
-         await syncMutex.acquire()
+
+         // get or create a mutex specific to modelName + where
+         const mutexKey = `${modelName}:${JSON.stringify(Object.fromEntries(Object.entries(where).sort()))}`
+         if (!syncMutexes.has(mutexKey)) syncMutexes.set(mutexKey, new Mutex())
+         // acquire it: no other sync operation from another client on this model+where can occur in parallel
+         await syncMutexes.get(mutexKey).acquire()
+
          try {
             console.log('>>>>> SYNC', modelName, where, cutoffDate)
             const databaseService = app.service(modelName)
@@ -83,8 +93,8 @@ export function drizzleOfflinePlugin(app, db, metadata, models) {
                accu[value.uid] = value
                return accu
             }, {})
-            // console.log('clientMetadataDict', clientMetadataDict)
-            // console.log('databaseValuesDict', databaseValuesDict)
+            console.log('clientMetadataDict', clientMetadataDict)
+            console.log('databaseValuesDict', databaseValuesDict)
          
             // STEP 2: compute intersections between client and database uids
             const onlyDatabaseIds = new Set()
@@ -106,9 +116,9 @@ export function drizzleOfflinePlugin(app, db, metadata, models) {
                   onlyClientIds.add(uid)
                }
             }
-            // console.log('onlyDatabaseIds', onlyDatabaseIds)
-            // console.log('onlyClientIds', onlyClientIds)
-            // console.log('databaseAndClientIds', databaseAndClientIds)
+            console.log('onlyDatabaseIds', onlyDatabaseIds)
+            console.log('onlyClientIds', onlyClientIds)
+            console.log('databaseAndClientIds', databaseAndClientIds)
          
             // STEP 3: build add/update/delete sets
             const addDatabase = []
@@ -130,10 +140,8 @@ export function drizzleOfflinePlugin(app, db, metadata, models) {
                const clientMetaData = clientMetadataDict[uid]
                if (clientMetaData.deleted_at) {
                   deleteClient.push([uid, clientMetaData.deleted_at])
-               } else if (new Date(clientMetaData.created_at) > cutoffDate) {
-                  addDatabase.push(clientMetaData)
                } else {
-                  // ???
+                  addDatabase.push(clientMetaData)
                }
             }
          
@@ -186,7 +194,7 @@ export function drizzleOfflinePlugin(app, db, metadata, models) {
          } catch(err) {
             console.log('*** err sync', err)
          } finally {
-            syncMutex.release()
+            syncMutexes.get(mutexKey).release()
          }
       },
    })

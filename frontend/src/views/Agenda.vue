@@ -73,7 +73,7 @@ async function deleteSelectedRange() {
 
       <div v-if="showModal" class="modal-backdrop" @click.self="cancelCreate">
          <div class="modal">
-            <p class="modal-title">Nom de la plage</p>
+            <p class="modal-title">Texte à afficher</p>
             <input
                v-model="labelInput"
                class="modal-input"
