@@ -7,12 +7,14 @@ import Agenda from '/src/views/Agenda.vue'
 const routes = [
    {
       path: '/auth',
-      // name: 'auth',
       component: () => import('/src/views/Auth.vue'),
    },
    {
+      path: '/not-connected',
+      component: () => import('/src/views/NotConnected.vue'),
+   },
+   {
       path: '/agenda',
-      // name: 'agenda',
       component: Agenda,
       meta: {
          requiresAuth: true
