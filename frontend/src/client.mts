@@ -494,7 +494,6 @@ export function offlinePlugin(app) {
       await mutex.acquire()
       console.log('synchronize', modelName, where)
 
-      let toAdd = []
       try {
          const requestPredicate = wherePredicate(where)
 
@@ -513,28 +512,27 @@ export function offlinePlugin(app) {
          }
 
          // call sync service on `where` perimeter
-         const syncResult = await app.service('sync').go(modelName, where, cutoffDate, clientMetadataDict)
-         toAdd = syncResult.toAdd
-         const { toUpdate, toDelete, addDatabase, updateDatabase } = syncResult
-         console.log('-> service.sync', modelName, where, toAdd, toUpdate, toDelete, addDatabase, updateDatabase)
+         const { addClient, updateClient, deleteClient, addDatabase, updateDatabase } =
+            await app.service('sync').go(modelName, where, cutoffDate, clientMetadataDict)
+         console.log('-> service.sync', modelName, where, addClient, updateClient, deleteClient, addDatabase, updateDatabase)
 
          // 1- add missing elements in indexedDB cache
          // Use a single transaction for all adds to ensure atomicity
-         if (toAdd.length > 0) {
+         if (addClient.length > 0) {
             await idbValues.db.transaction('rw', [idbValues, idbMetadata], async () => {
-               for (const [value, metaData] of toAdd) {
+               for (const [value, metaData] of addClient) {
                   await idbValues.add(value)
                   await idbMetadata.add(metaData)
                }
             })
          }
          // 2- delete elements from indexedDB cache
-         for (const [uid, deleted_at] of toDelete) {
+         for (const [uid, deleted_at] of deleteClient) {
             await idbValues.delete(uid)
             await idbMetadata.update(uid, { deleted_at })
          }
          // 3- update elements of cache
-         for (const elt of toUpdate) {
+         for (const elt of updateClient) {
             // get full value of element to update
             const value = await app.service(modelName).findUnique({ where:{ uid: elt.uid }})
             delete value.uid

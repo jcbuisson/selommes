@@ -145,21 +145,21 @@ export function drizzleOfflinePlugin(app, db, metadata, models) {
             console.log('>>>>> SYNC', modelName, where, cutoffDate)
             const databaseService = app.service(modelName)
       
-            // STEP 1: get existing database `where` values
+            // STEP1: get existing database `where` values and build a dictionary
             const databaseValues = await databaseService.findMany(where)
-         
             const databaseValuesDict = databaseValues.reduce((accu, value) => {
                accu[value.uid] = value
                return accu
             }, {})
 
-            // pre-fetch DB metadata for all database uids
+            // STEP2: pre-fetch DB metadata for all database uids
             const databaseMetadataDict = {}
             for (const uid of Object.keys(databaseValuesDict)) {
                const meta = (await db.select().from(metadata).where(eq(metadata.uid, uid)))[0]
                if (meta) databaseMetadataDict[uid] = meta
             }
 
+            // STEP3: sync algorithm - compute actions to do on both sides
             const { addClient, updateClient, deleteClient, addDatabase, updateDatabase, deleteDatabase } =
                computeSyncResult(databaseValuesDict, clientMetadataDict, databaseMetadataDict)
 
@@ -175,7 +175,7 @@ export function drizzleOfflinePlugin(app, db, metadata, models) {
                await databaseService.deleteWithMeta(uid, clientMetadataDict[uid].deleted_at)
             }
 
-            // STEP5: return changes for the client cache, and records to create/update on the database
+            // STEP5: return changes for the client cache, and the records to create/update on the database
             return { addClient, updateClient, deleteClient, addDatabase, updateDatabase }
          } catch(err) {
             console.log('*** err sync', err)
