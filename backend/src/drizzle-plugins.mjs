@@ -23,6 +23,65 @@ function whereToDrizzleFilters(table, where) {
 // DOIT FAIRE UN ROLLBACK EN CAS D'ERREUR SERVEUR (EX: ERREUR SÉMANTIQUE TYPE PB CLÉ ÉTRANGÈRE OU AUTRE)
 
 
+//////////////////////////       SYNC ALGORITHM (pure, exported for testing)       //////////////////////////
+
+export function computeSyncResult(databaseValuesDict, clientMetadataDict, databaseMetadataDict) {
+   const onlyDatabaseIds = new Set()
+   const onlyClientIds = new Set()
+   const databaseAndClientIds = new Set()
+
+   for (const uid in databaseValuesDict) {
+      if (uid in clientMetadataDict) databaseAndClientIds.add(uid)
+      else onlyDatabaseIds.add(uid)
+   }
+   for (const uid in clientMetadataDict) {
+      if (uid in databaseValuesDict) databaseAndClientIds.add(uid)
+      else onlyClientIds.add(uid)
+   }
+
+   const addDatabase = [], updateDatabase = [], deleteDatabase = []
+   const addClient = [], updateClient = [], deleteClient = []
+
+   for (const uid of onlyDatabaseIds) {
+      const databaseMetaData = databaseMetadataDict[uid] || { uid, created_at: new Date() }
+      addClient.push([databaseValuesDict[uid], databaseMetaData])
+   }
+
+   for (const uid of onlyClientIds) {
+      const clientMetaData = clientMetadataDict[uid]
+      if (clientMetaData.deleted_at) {
+         deleteClient.push([uid, clientMetaData.deleted_at])
+      } else {
+         addDatabase.push(clientMetaData)
+      }
+   }
+
+   for (const uid of databaseAndClientIds) {
+      const clientMetaData = clientMetadataDict[uid]
+      if (clientMetaData.deleted_at) {
+         deleteDatabase.push(uid)
+         deleteClient.push([uid, clientMetaData.deleted_at])
+      } else {
+         const databaseMetaData = databaseMetadataDict[uid] || { uid, created_at: new Date() }
+         const clientUpdatedAt = new Date(clientMetaData.updated_at || clientMetaData.created_at)
+         const databaseUpdatedAt = new Date(databaseMetaData.updated_at || databaseMetaData.created_at)
+         const diff = clientUpdatedAt - databaseUpdatedAt
+         if (diff > 0) updateDatabase.push(clientMetaData)
+         else if (diff < 0) updateClient.push(databaseValuesDict[uid])
+      }
+   }
+
+   return {
+      addClient,
+      updateClient,
+      deleteClient,
+      addDatabase,
+      updateDatabase,
+      deleteDatabase,
+   }
+}
+
+
 //////////////////////////       DRIZZLE OFFLINE PLUGIN       //////////////////////////
 
 export function drizzleOfflinePlugin(app, db, metadata, models) {
@@ -93,104 +152,31 @@ export function drizzleOfflinePlugin(app, db, metadata, models) {
                accu[value.uid] = value
                return accu
             }, {})
-            console.log('clientMetadataDict', clientMetadataDict)
-            console.log('databaseValuesDict', databaseValuesDict)
-         
-            // STEP 2: compute intersections between client and database uids
-            const onlyDatabaseIds = new Set()
-            const onlyClientIds = new Set()
-            const databaseAndClientIds = new Set()
-         
-            for (const uid in databaseValuesDict) {
-               if (uid in clientMetadataDict) {
-                  databaseAndClientIds.add(uid)
-               } else {
-                  onlyDatabaseIds.add(uid)
-               }
+
+            // pre-fetch DB metadata for all database uids
+            const databaseMetadataDict = {}
+            for (const uid of Object.keys(databaseValuesDict)) {
+               const meta = (await db.select().from(metadata).where(eq(metadata.uid, uid)))[0]
+               if (meta) databaseMetadataDict[uid] = meta
             }
-         
-            for (const uid in clientMetadataDict) {
-               if (uid in databaseValuesDict) {
-                  databaseAndClientIds.add(uid)
-               } else {
-                  onlyClientIds.add(uid)
-               }
-            }
-            console.log('onlyDatabaseIds', onlyDatabaseIds)
-            console.log('onlyClientIds', onlyClientIds)
-            console.log('databaseAndClientIds', databaseAndClientIds)
-         
-            // STEP 3: build add/update/delete sets
-            const addDatabase = []
-            const updateDatabase = []
-            const deleteDatabase = []
-         
-            const addClient = []
-            const updateClient = []
-            const deleteClient = []
-         
-            for (const uid of onlyDatabaseIds) {
-               const databaseValue = databaseValuesDict[uid]
-               const databaseMetaData = (await db.select().from(metadata).where(eq(metadata.uid, uid)))[0]
-                  || { uid, created_at: new Date() } // should not happen
-               addClient.push([databaseValue, databaseMetaData])
-            }
-         
-            for (const uid of onlyClientIds) {
-               const clientMetaData = clientMetadataDict[uid]
-               if (clientMetaData.deleted_at) {
-                  deleteClient.push([uid, clientMetaData.deleted_at])
-               } else {
-                  addDatabase.push(clientMetaData)
-               }
-            }
-         
-            for (const uid of databaseAndClientIds) {
-               const databaseValue = databaseValuesDict[uid]
-               const clientMetaData = clientMetadataDict[uid]
-                  || { uid, created_at: new Date() } // should not happen
-               if (clientMetaData.deleted_at) {
-                  deleteDatabase.push(uid)
-                  deleteClient.push([uid, clientMetaData.deleted_at])
-               } else {
-                  const databaseMetaData = (await db.select().from(metadata).where(eq(metadata.uid, uid)))[0]
-                     || { uid, created_at: new Date() } // should not happen
-                  const clientUpdatedAt = new Date(clientMetaData.updated_at || clientMetaData.created_at)
-                  const databaseUpdatedAt = new Date(databaseMetaData.updated_at || databaseMetaData.created_at)
-                  const dateDifference = clientUpdatedAt - databaseUpdatedAt
-                  // console.log('databaseMetaData', databaseMetaData, 'clientMetaData', clientMetaData, 'dateDifference', dateDifference)
-                  if (dateDifference > 0) {
-                     updateDatabase.push(clientMetaData)
-                  } else if (dateDifference < 0) {
-                     updateClient.push(databaseValue)
-                  }
-               }
-            }
+
+            const { addClient, updateClient, deleteClient, addDatabase, updateDatabase, deleteDatabase } =
+               computeSyncResult(databaseValuesDict, clientMetadataDict, databaseMetadataDict)
+
             console.log('addDatabase', truncateString(JSON.stringify(addDatabase)))
             console.log('deleteDatabase', truncateString(JSON.stringify(deleteDatabase)))
             console.log('updateDatabase', truncateString(JSON.stringify(updateDatabase)))
-         
             console.log('addClient', truncateString(JSON.stringify(addClient)))
             console.log('deleteClient', truncateString(JSON.stringify(deleteClient)))
             console.log('updateClient', truncateString(JSON.stringify(updateClient)))
          
             // STEP4: execute database deletions
             for (const uid of deleteDatabase) {
-               const clientMetaData = clientMetadataDict[uid]
-               // console.log('---delete', uid, clientMetaData)
-               await databaseService.deleteWithMeta(uid, clientMetaData.deleted_at)
+               await databaseService.deleteWithMeta(uid, clientMetadataDict[uid].deleted_at)
             }
-         
-            // STEP5: return to client the changes to perform on its cache, and create/update to perform on database with full data
-            // Database creations & updates are done later by the client with complete data (this function only has client values's meta-data)
-            return {
-               toAdd: addClient,
-               toUpdate: updateClient,
-               toDelete: deleteClient,
 
-               addDatabase,
-               updateDatabase,
-            }
+            // STEP5: return changes for the client cache, and records to create/update on the database
+            return { addClient, updateClient, deleteClient, addDatabase, updateDatabase }
          } catch(err) {
             console.log('*** err sync', err)
          } finally {

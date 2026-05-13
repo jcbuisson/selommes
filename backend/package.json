@@ -29,7 +29,7 @@
   "scripts": {
     "dev": "node --watch --experimental-strip-types src/app.js",
     "start": "node --experimental-strip-types src/app.js",
-    "test": ""
+    "test": "node --test test/sync.test.mjs"
   },
   "dependencies": {
     "@jcbuisson/express-x": "^3.0.3",
