@@ -1,10 +1,27 @@
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+
+import { app } from '/src/client-app.ts';
+
+const router = useRouter()
 
 const email = ref('')
 
 async function onSubmit() {
-   console.log('login', email.value)
+   console.log('login', email.value);
+   const user = await app.service('user').findUnique({ email: email.value });
+   console.log('user', user);
+   if (user) {
+      localStorage.setItem('user_uid', user.uid);
+      localStorage.setItem('color', user.color);
+      router.push('/agenda')
+   } else {
+      router.push({
+         path: '/create-user',
+         query: { email: email.value },
+      })
+   }
 }
 </script>
 

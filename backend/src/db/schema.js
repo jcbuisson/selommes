@@ -9,7 +9,7 @@ export const metadata = pgTable("metadata", {
 
 export const user = pgTable("user", {
    uid: uuid("uid").defaultRandom().primaryKey(),
-   email: text().notNull(),
+   email: text().notNull().unique(),
    name: text().notNull(),
    color: text().notNull(),
 });

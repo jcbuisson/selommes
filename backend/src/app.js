@@ -8,6 +8,7 @@ import { expressX, reloadPlugin } from '@jcbuisson/express-x'
 // import { drizzleOfflinePlugin } from '@jcbuisson/express-x-drizzle'
 import { drizzleOfflinePlugin } from '#root/src/drizzle-plugins.mjs'
 
+// import authService from '#root/src/services/auth.service.js'
 import publish from './publish.js'
 import { metadata, user, range } from '#root/src/db/schema.js';
 
@@ -20,6 +21,8 @@ const db = drizzle(process.env.DATABASE_URL);
 
 // add offline synchronization and database services for models 'user' and 'range'
 app.configure(drizzleOfflinePlugin, db, metadata, [ user, range ])
+
+// app.configure(authService);
 
 // preserve socket data & rooms membership on page reload
 app.configure(reloadPlugin)

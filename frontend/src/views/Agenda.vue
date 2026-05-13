@@ -30,9 +30,9 @@ async function confirmCreate() {
    showModal.value = false
    await createRange({
       label: labelInput.value,
-      color: '#f38ba8',
+      color: localStorage.color,
       start, end,
-      user_uid: '90282bfb-64dc-457c-88f8-525b527259e3',
+      user_uid: localStorage.user_uid,
    })
 }
 

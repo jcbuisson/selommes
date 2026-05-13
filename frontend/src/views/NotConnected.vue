@@ -20,7 +20,7 @@ const router = useRouter()
 }
 
 .btn {
-   padding: 0.55rem 1.25rem;
+   padding: 1rem 2.25rem;
    border-radius: 8px;
    border: none;
    background: #89b4fa;
