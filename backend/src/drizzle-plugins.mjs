@@ -81,6 +81,25 @@ export function computeSyncResult(databaseValuesDict, clientMetadataDict, databa
    }
 }
 
+// Orchestrates one sync cycle: fetches DB metadata, computes result, executes deletions.
+// getMetadata(uid) and deleteRecord(uid, deleted_at) are injected for testability.
+export async function runSync(databaseValuesDict, clientMetadataDict, getMetadata, deleteRecord) {
+   const databaseMetadataDict = {}
+   for (const uid of Object.keys(databaseValuesDict)) {
+      const meta = await getMetadata(uid)
+      if (meta) databaseMetadataDict[uid] = meta
+   }
+
+   const result = computeSyncResult(databaseValuesDict, clientMetadataDict, databaseMetadataDict)
+
+   for (const uid of result.deleteDatabase) {
+      await deleteRecord(uid, clientMetadataDict[uid].deleted_at)
+   }
+
+   const { addClient, updateClient, deleteClient, addDatabase, updateDatabase } = result
+   return { addClient, updateClient, deleteClient, addDatabase, updateDatabase }
+}
+
 
 //////////////////////////       DRIZZLE OFFLINE PLUGIN       //////////////////////////
 
@@ -152,31 +171,21 @@ export function drizzleOfflinePlugin(app, db, metadata, models) {
                return accu
             }, {})
 
-            // STEP2: pre-fetch DB metadata for all database uids
-            const databaseMetadataDict = {}
-            for (const uid of Object.keys(databaseValuesDict)) {
-               const meta = (await db.select().from(metadata).where(eq(metadata.uid, uid)))[0]
-               if (meta) databaseMetadataDict[uid] = meta
-            }
+            // STEPS 2-4: fetch metadata, compute sync result, execute deletions
+            const result = await runSync(
+               databaseValuesDict,
+               clientMetadataDict,
+               async uid => (await db.select().from(metadata).where(eq(metadata.uid, uid)))[0] ?? null,
+               (uid, deleted_at) => databaseService.deleteWithMeta(uid, deleted_at),
+            )
 
-            // STEP3: sync algorithm - compute actions to do on both sides
-            const { addClient, updateClient, deleteClient, addDatabase, updateDatabase, deleteDatabase } =
-               computeSyncResult(databaseValuesDict, clientMetadataDict, databaseMetadataDict)
+            console.log('addDatabase', truncateString(JSON.stringify(result.addDatabase)))
+            console.log('updateDatabase', truncateString(JSON.stringify(result.updateDatabase)))
+            console.log('addClient', truncateString(JSON.stringify(result.addClient)))
+            console.log('deleteClient', truncateString(JSON.stringify(result.deleteClient)))
+            console.log('updateClient', truncateString(JSON.stringify(result.updateClient)))
 
-            console.log('addDatabase', truncateString(JSON.stringify(addDatabase)))
-            console.log('deleteDatabase', truncateString(JSON.stringify(deleteDatabase)))
-            console.log('updateDatabase', truncateString(JSON.stringify(updateDatabase)))
-            console.log('addClient', truncateString(JSON.stringify(addClient)))
-            console.log('deleteClient', truncateString(JSON.stringify(deleteClient)))
-            console.log('updateClient', truncateString(JSON.stringify(updateClient)))
-         
-            // STEP4: execute database deletions
-            for (const uid of deleteDatabase) {
-               await databaseService.deleteWithMeta(uid, clientMetadataDict[uid].deleted_at)
-            }
-
-            // STEP5: return changes for the client cache, and the records to create/update on the database
-            return { addClient, updateClient, deleteClient, addDatabase, updateDatabase }
+            return result
          } catch(err) {
             console.log('*** err sync', err)
          } finally {

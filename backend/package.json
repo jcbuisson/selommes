@@ -29,7 +29,7 @@
   "scripts": {
     "dev": "node --watch --experimental-strip-types src/app.js",
     "start": "node --experimental-strip-types src/app.js",
-    "test": "node --test test/sync.test.mjs"
+    "test": "node --experimental-strip-types --test test/sync.test.mjs test/dialog.real.test.mjs"
   },
   "dependencies": {
     "@jcbuisson/express-x": "^3.0.3",
@@ -47,6 +47,7 @@
   "devDependencies": {
     "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.31.10",
+    "fake-indexeddb": "^6.2.5",
     "tsx": "^4.21.0"
   }
 }
