@@ -4,7 +4,8 @@
       "Bash(git ls-tree:*)",
       "Bash(git log:*)",
       "Bash(node:*)",
-      "Bash(grep -E \"\\\\.\\(js|ts|sql\\)$\")"
+      "Bash(grep -E \"\\\\.\\(js|ts|sql\\)$\")",
+      "Bash(npm test *)"
     ]
   }
 }
