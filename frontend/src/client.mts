@@ -99,7 +99,7 @@ export function createClient(socket, options={}) {
                delete waitingPromisesByUid[uid]
                reject(`Error: timeout on service '${name}', action '${action}', args: ${JSON.stringify(args)}`)
             }, serviceOptions.timeout)
-            timer.unref(); // so it doesn't prevent process exit
+            timer.unref(); // so it doesn't prevent process exit (Claude)
          }
       })
       // send request to server through websocket
