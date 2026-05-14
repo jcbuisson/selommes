@@ -95,10 +95,11 @@ export function createClient(socket, options={}) {
          waitingPromisesByUid[uid] = [resolve, reject]
          // a timeout may also reject the promise
          if (serviceOptions.timeout && !serviceOptions.volatile) {
-            setTimeout(() => {
+            const timer = setTimeout(() => {
                delete waitingPromisesByUid[uid]
                reject(`Error: timeout on service '${name}', action '${action}', args: ${JSON.stringify(args)}`)
             }, serviceOptions.timeout)
+            timer.unref(); // so it doesn't prevent process exit
          }
       })
       // send request to server through websocket
