@@ -74,21 +74,149 @@ function createTestApp(serverValues = {}, serverMetadata = {}) {
    }
 }
 
+function setupMockedClient() {
+   return {
+      isConnected: true,
+      disconnectedDate: null,
+      connectedDate: new Date(),
+      addConnectListener:    () => {},
+      addDisconnectListener: () => {},
+      addErrorListener:      () => {},
+
+
+      service(name) {
+         if (name === 'sync') {
+            return {
+               on: () => {},
+               go: async (modelName, where, _cutoffDate, clientMetadataDict) => {
+                  const dbValuesDict = Object.fromEntries(
+                     Object.entries(values).filter(([, v]) => matchesWhere(v, where))
+                  )
+                  return runSync(
+                     dbValuesDict,
+                     clientMetadataDict,
+                     uid => Promise.resolve(metadata[uid] ?? null),
+                     async (uid, deleted_at) => {
+                        delete values[uid]
+                        if (metadata[uid]) metadata[uid] = { ...metadata[uid], deleted_at }
+                     }
+                  )
+               },
+            }
+         }
+         // Model service: handles callbacks from the client during sync steps 3-5
+         return {
+            on: () => {},
+            findUnique: async (args) => {
+               // client calls findUnique({ where: { uid } })
+               // structuredClone mirrors the deep copy that JSON serialisation gives in production
+               const uid = args?.where?.uid ?? args?.uid
+               return values[uid] ? structuredClone(values[uid]) : null
+            },
+            createWithMeta: async (uid, data, created_at) => {
+               values[uid] = { uid, ...data }
+               metadata[uid] = { uid, created_at }
+            },
+            updateWithMeta: async (uid, data, updated_at) => {
+               if (values[uid]) Object.assign(values[uid], data)
+               if (metadata[uid]) metadata[uid] = { ...metadata[uid], updated_at }
+            },
+         }
+      },
+
+   }
+}
+
+function setupMockedServer(serverValues = {}, serverMetadata = {}) {
+   const values   = structuredClone(serverValues)
+   const metadata = structuredClone(serverMetadata)
+
+   return {
+      serverState: { values, metadata },
+
+      service(name) {
+         if (name === 'sync') {
+            return {
+               on: () => {},
+               go: async (modelName, where, _cutoffDate, clientMetadataDict) => {
+                  const dbValuesDict = Object.fromEntries(
+                     Object.entries(values).filter(([, v]) => matchesWhere(v, where))
+                  )
+                  return runSync(
+                     dbValuesDict,
+                     clientMetadataDict,
+                     uid => Promise.resolve(metadata[uid] ?? null),
+                     async (uid, deleted_at) => {
+                        delete values[uid]
+                        if (metadata[uid]) metadata[uid] = { ...metadata[uid], deleted_at }
+                     }
+                  )
+               },
+            }
+         }
+         // Model service: handles callbacks from the client during sync steps 3-5
+         return {
+            on: () => {},
+            findUnique: async (args) => {
+               // client calls findUnique({ where: { uid } })
+               // structuredClone mirrors the deep copy that JSON serialisation gives in production
+               const uid = args?.where?.uid ?? args?.uid
+               return values[uid] ? structuredClone(values[uid]) : null
+            },
+            createWithMeta: async (uid, data, created_at) => {
+               values[uid] = { uid, ...data }
+               metadata[uid] = { uid, created_at }
+            },
+            updateWithMeta: async (uid, data, updated_at) => {
+               if (values[uid]) Object.assign(values[uid], data)
+               if (metadata[uid]) metadata[uid] = { ...metadata[uid], updated_at }
+            },
+         }
+      },
+   }
+}
+
 // Each test gets a unique Dexie database name so instances never collide
 let dbCounter = 0
 
 async function setup(serverValues = {}, serverMetadata = {}) {
+
    const app = createTestApp(serverValues, serverMetadata)
+
    offlinePlugin(app)
+   
    const model = app.createOfflineModel(`test-${++dbCounter}`, ['label', 'user_uid'])
-   // Register the where clause so synchronizeAll knows what scope to sync
    await model.addSynchroWhere({})
    return { app, model }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('real client.mts ↔ server dialog', () => {
+describe('client ↔ server synchronization', () => {
+
+   test('empty client pulls all records from server', async () => {
+
+      const appServer = setupMockedServer(
+         { a: { uid: 'a', label: 'Vacances' } },
+         { a: { uid: 'a', created_at: T0 } },
+      );
+
+      const appClient = setupMockedClient();
+      offlinePlugin(appClient);
+      const model = appClient.createOfflineModel(`test-${++dbCounter}`, ['label', 'user_uid']);
+
+      // run synchro on where={}
+      model.addSynchroWhere({});
+      await model.synchronizeAll();
+
+      const value = await model.db.values.get('a')
+      const meta  = await model.db.metadata.get('a')
+      assert.ok(value, 'record should be in client Dexie')
+      assert.equal(value.label, 'Vacances')
+      assert.deepEqual(meta.created_at, T0)
+      // server untouched
+      assert.ok(appServer.serverState.values['a'])
+   })
 
    test('empty client pulls all records from server', async () => {
       const { app, model } = await setup(
