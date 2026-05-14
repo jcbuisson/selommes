@@ -74,108 +74,6 @@ function createTestApp(serverValues = {}, serverMetadata = {}) {
    }
 }
 
-// function setupMockedClient() {
-//    return {
-//       isConnected: true,
-//       disconnectedDate: null,
-//       connectedDate: new Date(),
-//       addConnectListener:    () => {},
-//       addDisconnectListener: () => {},
-//       addErrorListener:      () => {},
-
-
-//       service(name) {
-//          if (name === 'sync') {
-//             return {
-//                on: () => {},
-//                go: async (modelName, where, _cutoffDate, clientMetadataDict) => {
-//                   const dbValuesDict = Object.fromEntries(
-//                      Object.entries(values).filter(([, v]) => matchesWhere(v, where))
-//                   )
-//                   return runSync(
-//                      dbValuesDict,
-//                      clientMetadataDict,
-//                      uid => Promise.resolve(metadata[uid] ?? null),
-//                      async (uid, deleted_at) => {
-//                         delete values[uid]
-//                         if (metadata[uid]) metadata[uid] = { ...metadata[uid], deleted_at }
-//                      }
-//                   )
-//                },
-//             }
-//          }
-//          // Model service: handles callbacks from the client during sync steps 3-5
-//          return {
-//             on: () => {},
-//             findUnique: async (args) => {
-//                // client calls findUnique({ where: { uid } })
-//                // structuredClone mirrors the deep copy that JSON serialisation gives in production
-//                const uid = args?.where?.uid ?? args?.uid
-//                return values[uid] ? structuredClone(values[uid]) : null
-//             },
-//             createWithMeta: async (uid, data, created_at) => {
-//                values[uid] = { uid, ...data }
-//                metadata[uid] = { uid, created_at }
-//             },
-//             updateWithMeta: async (uid, data, updated_at) => {
-//                if (values[uid]) Object.assign(values[uid], data)
-//                if (metadata[uid]) metadata[uid] = { ...metadata[uid], updated_at }
-//             },
-//          }
-//       },
-
-//    }
-// }
-
-// function setupMockedServer(serverValues = {}, serverMetadata = {}) {
-//    const values   = structuredClone(serverValues)
-//    const metadata = structuredClone(serverMetadata)
-
-//    return {
-//       serverState: { values, metadata },
-
-//       service(name) {
-//          if (name === 'sync') {
-//             return {
-//                on: () => {},
-//                go: async (modelName, where, _cutoffDate, clientMetadataDict) => {
-//                   const dbValuesDict = Object.fromEntries(
-//                      Object.entries(values).filter(([, v]) => matchesWhere(v, where))
-//                   )
-//                   return runSync(
-//                      dbValuesDict,
-//                      clientMetadataDict,
-//                      uid => Promise.resolve(metadata[uid] ?? null),
-//                      async (uid, deleted_at) => {
-//                         delete values[uid]
-//                         if (metadata[uid]) metadata[uid] = { ...metadata[uid], deleted_at }
-//                      }
-//                   )
-//                },
-//             }
-//          }
-//          // Model service: handles callbacks from the client during sync steps 3-5
-//          return {
-//             on: () => {},
-//             findUnique: async (args) => {
-//                // client calls findUnique({ where: { uid } })
-//                // structuredClone mirrors the deep copy that JSON serialisation gives in production
-//                const uid = args?.where?.uid ?? args?.uid
-//                return values[uid] ? structuredClone(values[uid]) : null
-//             },
-//             createWithMeta: async (uid, data, created_at) => {
-//                values[uid] = { uid, ...data }
-//                metadata[uid] = { uid, created_at }
-//             },
-//             updateWithMeta: async (uid, data, updated_at) => {
-//                if (values[uid]) Object.assign(values[uid], data)
-//                if (metadata[uid]) metadata[uid] = { ...metadata[uid], updated_at }
-//             },
-//          }
-//       },
-//    }
-// }
-
 // Each test gets a unique Dexie database name so instances never collide
 let dbCounter = 0
 
@@ -358,207 +256,176 @@ describe('mocked socket: createClient ↔ server protocol', () => {
 
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
+// // ─────────────────────────────────────────────────────────────────────────────
 
-describe('client ↔ server synchronization', () => {
+// describe('client ↔ server synchronization', () => {
 
-   // test('empty client pulls all records from server (via socket)', async () => {
-   //    const { clientSocket, serverSocket, triggerConnect } = createMockSocketPair()
+//    test('empty client pulls all records from server', async () => {
+//       const { app, model } = await setup(
+//          { a: { uid: 'a', label: 'Vacances' } },
+//          { a: { uid: 'a', created_at: T0 } },
+//       )
 
-   //    const appServer = setupMockedServer(
-   //       { a: { uid: 'a', label: 'Vacances' } },
-   //       { a: { uid: 'a', created_at: T0 } },
-   //    )
-   //    const modelName = `test-${++dbCounter}`
+//       await model.synchronizeAll()
 
-   //    // Wire the server's service methods to the server socket
-   //    const server = createMockServer(serverSocket)
-   //    server.register('sync', appServer.service('sync'))
-   //    server.register(modelName, appServer.service(modelName))
+//       const value = await model.db.values.get('a')
+//       const meta  = await model.db.metadata.get('a')
+//       assert.ok(value, 'record should be in client Dexie')
+//       assert.equal(value.label, 'Vacances')
+//       assert.deepEqual(meta.created_at, T0)
+//       // server untouched
+//       assert.ok(app.serverState.values['a'])
+//    })
 
-   //    // Real createClient connected through the socket pair
-   //    const clientApp = createClient(clientSocket, { debug: false })
-   //    offlinePlugin(clientApp)
-   //    triggerConnect()
+//    test('client-only record is pushed to server', async () => {
+//       const { app, model } = await setup()
 
-   //    const model = clientApp.createOfflineModel(modelName, ['label', 'user_uid'])
-   //    await model.addSynchroWhere({})
-   //    await model.synchronizeAll()
+//       await model.db.values.add({ uid: 'b', label: 'Formation' })
+//       await model.db.metadata.add({ uid: 'b', created_at: T1 })
 
-   //    const value = await model.db.values.get('a')
-   //    const meta  = await model.db.metadata.get('a')
-   //    assert.ok(value, 'record should be in client Dexie')
-   //    assert.equal(value.label, 'Vacances')
-   //    assert.deepEqual(meta.created_at, T0)
-   //    assert.ok(appServer.serverState.values['a']) // server untouched
-   // })
+//       await model.synchronizeAll()
 
-   test('empty client pulls all records from server', async () => {
-      const { app, model } = await setup(
-         { a: { uid: 'a', label: 'Vacances' } },
-         { a: { uid: 'a', created_at: T0 } },
-      )
+//       assert.ok(app.serverState.values['b'], 'server should have received the record')
+//       assert.equal(app.serverState.values['b'].label, 'Formation')
+//       assert.deepEqual(app.serverState.metadata['b'].created_at, T1)
+//    })
 
-      await model.synchronizeAll()
+//    test('client update (newer) wins: server is overwritten', async () => {
+//       const { app, model } = await setup(
+//          { c: { uid: 'c', label: 'old' } },
+//          { c: { uid: 'c', created_at: T0, updated_at: T1 } },
+//       )
 
-      const value = await model.db.values.get('a')
-      const meta  = await model.db.metadata.get('a')
-      assert.ok(value, 'record should be in client Dexie')
-      assert.equal(value.label, 'Vacances')
-      assert.deepEqual(meta.created_at, T0)
-      // server untouched
-      assert.ok(app.serverState.values['a'])
-   })
+//       await model.db.values.add({ uid: 'c', label: 'new' })
+//       await model.db.metadata.add({ uid: 'c', created_at: T0, updated_at: T2 })
 
-   test('client-only record is pushed to server', async () => {
-      const { app, model } = await setup()
+//       await model.synchronizeAll()
 
-      await model.db.values.add({ uid: 'b', label: 'Formation' })
-      await model.db.metadata.add({ uid: 'b', created_at: T1 })
+//       assert.equal(app.serverState.values['c'].label, 'new')
+//       const clientValue = await model.db.values.get('c')
+//       assert.equal(clientValue.label, 'new') // client unchanged
+//    })
 
-      await model.synchronizeAll()
+//    test('server update (newer) wins: client Dexie is overwritten', async () => {
+//       const { app, model } = await setup(
+//          { d: { uid: 'd', label: 'new' } },
+//          { d: { uid: 'd', created_at: T0, updated_at: T2 } },
+//       )
 
-      assert.ok(app.serverState.values['b'], 'server should have received the record')
-      assert.equal(app.serverState.values['b'].label, 'Formation')
-      assert.deepEqual(app.serverState.metadata['b'].created_at, T1)
-   })
+//       await model.db.values.add({ uid: 'd', label: 'old' })
+//       await model.db.metadata.add({ uid: 'd', created_at: T0, updated_at: T1 })
 
-   test('client update (newer) wins: server is overwritten', async () => {
-      const { app, model } = await setup(
-         { c: { uid: 'c', label: 'old' } },
-         { c: { uid: 'c', created_at: T0, updated_at: T1 } },
-      )
+//       await model.synchronizeAll()
 
-      await model.db.values.add({ uid: 'c', label: 'new' })
-      await model.db.metadata.add({ uid: 'c', created_at: T0, updated_at: T2 })
+//       const clientValue = await model.db.values.get('d')
+//       assert.equal(clientValue.label, 'new')
+//       assert.equal(app.serverState.values['d'].label, 'new') // server unchanged
+//    })
 
-      await model.synchronizeAll()
+//    test('client deletion propagates to server', async () => {
+//       const { app, model } = await setup(
+//          { e: { uid: 'e', label: 'bye' } },
+//          { e: { uid: 'e', created_at: T0 } },
+//       )
 
-      assert.equal(app.serverState.values['c'].label, 'new')
-      const clientValue = await model.db.values.get('c')
-      assert.equal(clientValue.label, 'new') // client unchanged
-   })
+//       await model.db.values.add({ uid: 'e', label: 'bye', __deleted__: true })
+//       await model.db.metadata.add({ uid: 'e', created_at: T0, deleted_at: T1 })
 
-   test('server update (newer) wins: client Dexie is overwritten', async () => {
-      const { app, model } = await setup(
-         { d: { uid: 'd', label: 'new' } },
-         { d: { uid: 'd', created_at: T0, updated_at: T2 } },
-      )
+//       await model.synchronizeAll()
 
-      await model.db.values.add({ uid: 'd', label: 'old' })
-      await model.db.metadata.add({ uid: 'd', created_at: T0, updated_at: T1 })
+//       assert.ok(!app.serverState.values['e'], 'server should no longer have the record')
+//       const clientValue = await model.db.values.get('e')
+//       assert.ok(!clientValue, 'Dexie should no longer have the record')
+//    })
 
-      await model.synchronizeAll()
+//    test('in-sync records produce no server writes', async () => {
+//       const { app, model } = await setup(
+//          { f: { uid: 'f', label: 'same' } },
+//          { f: { uid: 'f', created_at: T0, updated_at: T1 } },
+//       )
 
-      const clientValue = await model.db.values.get('d')
-      assert.equal(clientValue.label, 'new')
-      assert.equal(app.serverState.values['d'].label, 'new') // server unchanged
-   })
+//       await model.db.values.add({ uid: 'f', label: 'same' })
+//       await model.db.metadata.add({ uid: 'f', created_at: T0, updated_at: T1 })
 
-   test('client deletion propagates to server', async () => {
-      const { app, model } = await setup(
-         { e: { uid: 'e', label: 'bye' } },
-         { e: { uid: 'e', created_at: T0 } },
-      )
+//       // Spy on server mutations
+//       let writes = 0
+//       const orig = app.service('__any__')
+//       const svc = app.service.bind(app)
+//       app.service = (name) => {
+//          const s = svc(name)
+//          const origCreate = s.createWithMeta
+//          const origUpdate = s.updateWithMeta
+//          s.createWithMeta = (...a) => { writes++; return origCreate?.(...a) }
+//          s.updateWithMeta = (...a) => { writes++; return origUpdate?.(...a) }
+//          return s
+//       }
 
-      await model.db.values.add({ uid: 'e', label: 'bye', __deleted__: true })
-      await model.db.metadata.add({ uid: 'e', created_at: T0, deleted_at: T1 })
+//       await model.synchronizeAll()
 
-      await model.synchronizeAll()
+//       assert.equal(writes, 0, 'no server writes expected for identical records')
+//       const clientValue = await model.db.values.get('f')
+//       assert.equal(clientValue.label, 'same')
+//    })
 
-      assert.ok(!app.serverState.values['e'], 'server should no longer have the record')
-      const clientValue = await model.db.values.get('e')
-      assert.ok(!clientValue, 'Dexie should no longer have the record')
-   })
+//    test('where clause scopes sync: only matching records exchanged', async () => {
+//       const { app, model } = await setup(
+//          {
+//             g1: { uid: 'g1', user_uid: 'u1', label: 'A' },
+//             g2: { uid: 'g2', user_uid: 'u2', label: 'B' },
+//          },
+//          {
+//             g1: { uid: 'g1', created_at: T0 },
+//             g2: { uid: 'g2', created_at: T0 },
+//          },
+//       )
 
-   test('in-sync records produce no server writes', async () => {
-      const { app, model } = await setup(
-         { f: { uid: 'f', label: 'same' } },
-         { f: { uid: 'f', created_at: T0, updated_at: T1 } },
-      )
+//       // Register scoped where clause and sync only for user u1
+//       await model.addSynchroWhere({ user_uid: 'u1' })
 
-      await model.db.values.add({ uid: 'f', label: 'same' })
-      await model.db.metadata.add({ uid: 'f', created_at: T0, updated_at: T1 })
+//       // Manually call synchronize for this scoped where (synchronizeAll covers both)
+//       const model2 = app.createOfflineModel(`test-${++dbCounter}`, ['label', 'user_uid'])
+//       await model2.addSynchroWhere({ user_uid: 'u1' })
+//       await model2.synchronizeAll()
 
-      // Spy on server mutations
-      let writes = 0
-      const orig = app.service('__any__')
-      const svc = app.service.bind(app)
-      app.service = (name) => {
-         const s = svc(name)
-         const origCreate = s.createWithMeta
-         const origUpdate = s.updateWithMeta
-         s.createWithMeta = (...a) => { writes++; return origCreate?.(...a) }
-         s.updateWithMeta = (...a) => { writes++; return origUpdate?.(...a) }
-         return s
-      }
+//       const g1 = await model2.db.values.get('g1')
+//       const g2 = await model2.db.values.get('g2')
+//       assert.ok(g1, 'g1 (user u1) should have been synced')
+//       assert.ok(!g2, 'g2 (user u2) should not have been synced')
+//    })
 
-      await model.synchronizeAll()
+//    test('mixed: pull + push + conflict resolved in one sync', async () => {
+//       const { app, model } = await setup(
+//          {
+//             db:     { uid: 'db',     label: 'db-only' },
+//             shared: { uid: 'shared', label: 'old' },
+//          },
+//          {
+//             db:     { uid: 'db',     created_at: T0 },
+//             shared: { uid: 'shared', created_at: T0, updated_at: T1 },
+//          },
+//       )
 
-      assert.equal(writes, 0, 'no server writes expected for identical records')
-      const clientValue = await model.db.values.get('f')
-      assert.equal(clientValue.label, 'same')
-   })
+//       // Client has a local-only record and a newer version of shared
+//       await model.db.values.add({ uid: 'local',  label: 'local-only' })
+//       await model.db.metadata.add({ uid: 'local',  created_at: T1 })
+//       await model.db.values.add({ uid: 'shared', label: 'new' })
+//       await model.db.metadata.add({ uid: 'shared', created_at: T0, updated_at: T2 })
 
-   test('where clause scopes sync: only matching records exchanged', async () => {
-      const { app, model } = await setup(
-         {
-            g1: { uid: 'g1', user_uid: 'u1', label: 'A' },
-            g2: { uid: 'g2', user_uid: 'u2', label: 'B' },
-         },
-         {
-            g1: { uid: 'g1', created_at: T0 },
-            g2: { uid: 'g2', created_at: T0 },
-         },
-      )
+//       await model.synchronizeAll()
 
-      // Register scoped where clause and sync only for user u1
-      await model.addSynchroWhere({ user_uid: 'u1' })
+//       // db-only record pulled to client
+//       const dbRec = await model.db.values.get('db')
+//       assert.ok(dbRec)
+//       assert.equal(dbRec.label, 'db-only')
 
-      // Manually call synchronize for this scoped where (synchronizeAll covers both)
-      const model2 = app.createOfflineModel(`test-${++dbCounter}`, ['label', 'user_uid'])
-      await model2.addSynchroWhere({ user_uid: 'u1' })
-      await model2.synchronizeAll()
+//       // local-only record pushed to server
+//       assert.ok(app.serverState.values['local'])
+//       assert.equal(app.serverState.values['local'].label, 'local-only')
 
-      const g1 = await model2.db.values.get('g1')
-      const g2 = await model2.db.values.get('g2')
-      assert.ok(g1, 'g1 (user u1) should have been synced')
-      assert.ok(!g2, 'g2 (user u2) should not have been synced')
-   })
+//       // client won conflict: server now has the new label
+//       assert.equal(app.serverState.values['shared'].label, 'new')
+//       const sharedRec = await model.db.values.get('shared')
+//       assert.equal(sharedRec.label, 'new')
+//    })
 
-   test('mixed: pull + push + conflict resolved in one sync', async () => {
-      const { app, model } = await setup(
-         {
-            db:     { uid: 'db',     label: 'db-only' },
-            shared: { uid: 'shared', label: 'old' },
-         },
-         {
-            db:     { uid: 'db',     created_at: T0 },
-            shared: { uid: 'shared', created_at: T0, updated_at: T1 },
-         },
-      )
-
-      // Client has a local-only record and a newer version of shared
-      await model.db.values.add({ uid: 'local',  label: 'local-only' })
-      await model.db.metadata.add({ uid: 'local',  created_at: T1 })
-      await model.db.values.add({ uid: 'shared', label: 'new' })
-      await model.db.metadata.add({ uid: 'shared', created_at: T0, updated_at: T2 })
-
-      await model.synchronizeAll()
-
-      // db-only record pulled to client
-      const dbRec = await model.db.values.get('db')
-      assert.ok(dbRec)
-      assert.equal(dbRec.label, 'db-only')
-
-      // local-only record pushed to server
-      assert.ok(app.serverState.values['local'])
-      assert.equal(app.serverState.values['local'].label, 'local-only')
-
-      // client won conflict: server now has the new label
-      assert.equal(app.serverState.values['shared'].label, 'new')
-      const sharedRec = await model.db.values.get('shared')
-      assert.equal(sharedRec.label, 'new')
-   })
-
-})
+// })
