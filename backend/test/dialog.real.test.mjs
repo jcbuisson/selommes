@@ -514,6 +514,34 @@ describe('Full client ↔ server protocol', () => {
       }
    })
 
+   test('wherePredicate handles boolean equality correctly', async () => {
+      // typeof(true) === 'boolean', which is matched by neither the string/number branch
+      // nor the null branch nor the object branch — so boolean where-values are silently
+      // ignored and every record passes, sending wrong records into clientMetadataDict.
+      const modelName = `model${++dbCounter}`
+      const { db, metaTable, modelTable } = await createTestDb(modelName)
+
+      const { clientApp, cleanup } = await createTestContext(
+         serverApp => serverApp.configure(drizzleOfflinePlugin, db, metaTable, [modelTable]),
+         { useOfflinePlugin: true },
+      )
+
+      try {
+         const model = clientApp.createOfflineModel(modelName, ['label'])
+
+         await model.db.values.add({ uid: 'r1', label: 'active',   active: true  })
+         await model.db.values.add({ uid: 'r2', label: 'inactive', active: false })
+
+         const results = await model.findWhere({ active: true })
+         const uids = results.map(r => r.uid)
+
+         assert.ok( uids.includes('r1'), 'active=true  should match { active: true }')
+         assert.ok(!uids.includes('r2'), 'active=false should NOT match { active: true }')
+      } finally {
+         await cleanup()
+      }
+   })
+
    test('wherePredicate handles null equality correctly', async () => {
       // After fixing the TypeError on null, the previous fix used `value !== null`
       // to guard the object branch — but that leaves null with NO branch at all,

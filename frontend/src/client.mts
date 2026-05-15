@@ -603,7 +603,7 @@ function wherePredicate(where) {
       for (const [attr, value] of Object.entries(where)) {
          const eltAttrValue = elt[attr]
 
-         if (typeof(value) === 'string' || typeof(value) === 'number') {
+         if (typeof(value) === 'string' || typeof(value) === 'number' || typeof(value) === 'boolean') {
             // 'attr = value' clause
             if (eltAttrValue !== value) return false
 
