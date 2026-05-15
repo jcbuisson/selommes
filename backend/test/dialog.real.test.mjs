@@ -479,6 +479,63 @@ describe('Full client ↔ server protocol', () => {
       await new Promise(resolve => serverApp2.httpServer.close(resolve))
    })
 
+   test('compound range { gte, lte } filters consistently on both client and server', async () => {
+      // wherePredicate applies `lte` first (else-if chain); whereToDrizzleFilters applies
+      // `gte` first (return on first match). For { gte:1, lte:10 } this means:
+      //   client includes score=0  (only lte:10 checked → 0≤10 passes)
+      //   server includes score=15 (only gte:1  checked → 15≥1  passes)
+      // score=0  → addDatabase → pushed to server (wrong, outside range)
+      // score=15 → addClient  → added to client (wrong, outside range)
+      const modelName = `model${++dbCounter}`
+      const pglite = new PGlite()
+      await pglite.exec(`
+         CREATE TABLE metadata (uid TEXT PRIMARY KEY, created_at TIMESTAMP, updated_at TIMESTAMP, deleted_at TIMESTAMP);
+         CREATE TABLE "${modelName}" (uid TEXT PRIMARY KEY, label TEXT NOT NULL, score INTEGER NOT NULL);
+      `)
+      const db = drizzle(pglite)
+      const metaTable = pgTable('metadata', {
+         uid: text('uid').primaryKey(),
+         created_at: timestamp(), updated_at: timestamp(), deleted_at: timestamp(),
+      })
+      const modelTable = pgTable(modelName, {
+         uid: text('uid').primaryKey(),
+         label: text('label').notNull(),
+         score: integer('score').notNull(),
+      })
+
+      // Server has records below, inside, and above the range 1–10
+      await db.insert(modelTable).values([
+         { uid: 'lo',  label: 'low',    score: 0  },
+         { uid: 'mid', label: 'middle', score: 5  },
+         { uid: 'hi',  label: 'high',   score: 15 },
+      ])
+      await db.insert(metaTable).values([
+         { uid: 'lo',  created_at: T0 },
+         { uid: 'mid', created_at: T0 },
+         { uid: 'hi',  created_at: T0 },
+      ])
+
+      const { clientApp, cleanup } = await createTestContext(
+         serverApp => serverApp.configure(drizzleOfflinePlugin, db, metaTable, [modelTable]),
+         { useOfflinePlugin: true },
+      )
+
+      try {
+         const model = clientApp.createOfflineModel(modelName, ['label'])
+         await model.addSynchroWhere({ score: { gte: 1, lte: 10 } })
+         await model.synchronizeAll()
+
+         const vals = await model.db.values.toArray()
+         const uids = vals.map(v => v.uid)
+
+         assert.ok(!uids.includes('lo'),  'score=0  is below range and must NOT be in Dexie')
+         assert.ok( uids.includes('mid'), 'score=5  is in range and must be in Dexie')
+         assert.ok(!uids.includes('hi'),  'score=15 is above range and must NOT be in Dexie')
+      } finally {
+         await cleanup()
+      }
+   })
+
    test('whereToDrizzleFilters supports range operators used in addSynchroWhere', async () => {
       // wherePredicate (client) handles { score: { gte: 5 } } correctly after earlier fixes,
       // but whereToDrizzleFilters (server) only calls eq() for every value.

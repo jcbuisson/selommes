@@ -15,12 +15,15 @@ function whereToDrizzleFilters(table, where) {
    const conditions = Object.entries(where)
       .filter(([_, value]) => value !== undefined)
       .map(([key, value]) => {
-         if (value === null)           return isNull(table[key])
+         if (value === null) return isNull(table[key])
          if (typeof value === 'object') {
-            if ('gte' in value)        return gte(table[key], value.gte)
-            if ('gt'  in value)        return gt(table[key],  value.gt)
-            if ('lte' in value)        return lte(table[key], value.lte)
-            if ('lt'  in value)        return lt(table[key],  value.lt)
+            // Collect ALL range bounds — a compound { gte:1, lte:10 } needs both
+            const bounds = []
+            if ('gte' in value) bounds.push(gte(table[key], value.gte))
+            if ('gt'  in value) bounds.push(gt(table[key],  value.gt))
+            if ('lte' in value) bounds.push(lte(table[key], value.lte))
+            if ('lt'  in value) bounds.push(lt(table[key],  value.lt))
+            if (bounds.length > 0) return and(...bounds)
          }
          return eq(table[key], value)
       })
