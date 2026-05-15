@@ -257,6 +257,7 @@ export function offlinePlugin(app) {
                console.log(`*** err sync ${modelName} create`, err)
                // rollback
                await db.values.delete(uid)
+               await db.metadata.delete(uid)
             })
          }
          return await db.values.get(uid)

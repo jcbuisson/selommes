@@ -197,6 +197,46 @@ describe('Full client ↔ server protocol', () => {
       }
    })
 
+   test('create() rollback removes metadata when server rejects', async () => {
+      const modelName = `model${++dbCounter}`
+
+      const { clientApp, cleanup } = await createTestContext(serverApp => {
+         serverApp.createService(modelName, {
+            createWithMeta: async () => { throw new Error('server rejected') },
+            findMany:        async () => [],
+            updateWithMeta:  async () => {},
+            deleteWithMeta:  async () => {},
+         })
+         serverApp.createService('sync', {
+            go: async () => ({ addClient: [], updateClient: [], deleteClient: [], addDatabase: [], updateDatabase: [] }),
+         })
+      }, { useOfflinePlugin: true })
+
+      try {
+         const model = clientApp.createOfflineModel(modelName, ['label'])
+
+         // create() is optimistic: value + metadata are written to Dexie before the
+         // server responds, then rolled back if the server rejects.
+         const record = await model.create({ label: 'test' })
+         const uid = record.uid
+
+         assert.ok(await model.db.values.get(uid),    'value should exist optimistically')
+         assert.ok(await model.db.metadata.get(uid),  'metadata should exist optimistically')
+
+         // Poll until the rollback removes the value (server rejection processed)
+         for (let i = 0; i < 50; i++) {
+            await new Promise(r => setTimeout(r, 10))
+            if (!await model.db.values.get(uid)) break
+         }
+
+         assert.ok(!await model.db.values.get(uid),   'value should be removed after rollback')
+         // Metadata must also be cleaned up — currently it is not
+         assert.ok(!await model.db.metadata.get(uid), 'metadata should also be removed after rollback')
+      } finally {
+         await cleanup()
+      }
+   })
+
    test('deleted record is fully removed from Dexie metadata after sync', async () => {
       const modelName = `model${++dbCounter}`
       const { db, metaTable, modelTable } = await createTestDb(modelName)
