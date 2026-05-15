@@ -514,6 +514,36 @@ describe('Full client ↔ server protocol', () => {
       }
    })
 
+   test('wherePredicate handles null equality correctly', async () => {
+      // After fixing the TypeError on null, the previous fix used `value !== null`
+      // to guard the object branch — but that leaves null with NO branch at all,
+      // so `where = { user_uid: null }` passes every record instead of only those
+      // with user_uid === null.  In synchronize() this causes records with a non-null
+      // user_uid to appear as addDatabase, hit a PK conflict, and get deleted.
+      const modelName = `model${++dbCounter}`
+      const { db, metaTable, modelTable } = await createTestDb(modelName)
+
+      const { clientApp, cleanup } = await createTestContext(
+         serverApp => serverApp.configure(drizzleOfflinePlugin, db, metaTable, [modelTable]),
+         { useOfflinePlugin: true },
+      )
+
+      try {
+         const model = clientApp.createOfflineModel(modelName, ['label'])
+
+         await model.db.values.add({ uid: 'r1', label: 'with-user', user_uid: 'u1' })
+         await model.db.values.add({ uid: 'r2', label: 'no-user',   user_uid: null })
+
+         const results = await model.findWhere({ user_uid: null })
+         const uids = results.map(r => r.uid)
+
+         assert.ok(!uids.includes('r1'), 'record with user_uid=u1 should NOT match { user_uid: null }')
+         assert.ok( uids.includes('r2'), 'record with user_uid=null should match { user_uid: null }')
+      } finally {
+         await cleanup()
+      }
+   })
+
    test('wherePredicate handles falsy boundary value (lte: 0) correctly', async () => {
       // wherePredicate is used by synchronize() to build clientMetadataDict.
       // A falsy boundary (lte: 0) is checked with `if (value.lte)` which treats 0

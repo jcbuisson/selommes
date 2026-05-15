@@ -607,7 +607,11 @@ function wherePredicate(where) {
             // 'attr = value' clause
             if (eltAttrValue !== value) return false
 
-         } else if (typeof(value) === 'object' && value !== null) {
+         } else if (value === null) {
+            // 'attr = null' clause
+            if (eltAttrValue !== null) return false
+
+         } else if (typeof(value) === 'object') {
             // 'attr = { lt/lte/gt/gte: value }' clause
             if ('lte' in value) {
                if (eltAttrValue > value.lte) return false
