@@ -479,6 +479,39 @@ describe('Full client ↔ server protocol', () => {
       await new Promise(resolve => serverApp2.httpServer.close(resolve))
    })
 
+   test('wherePredicate range check excludes records whose field is null', async () => {
+      // The previous fix excluded undefined (NaN comparisons) but missed null.
+      // JS coerces null → 0 for numeric comparisons, so for { score: { lte: 10 } }:
+      //   null > 10  →  0 > 10  →  false  →  the lte guard doesn't fire
+      //   → null-score record passes the filter (wrong; SQL NULL never matches ranges).
+      // That record enters clientMetadataDict, appears as addDatabase to the server,
+      // and if score is NOT NULL the insert fails, rolling back the Dexie record.
+      const modelName = `model${++dbCounter}`
+      const { db, metaTable, modelTable } = await createTestDb(modelName)
+
+      const { clientApp, cleanup } = await createTestContext(
+         serverApp => serverApp.configure(drizzleOfflinePlugin, db, metaTable, [modelTable]),
+         { useOfflinePlugin: true },
+      )
+
+      try {
+         const model = clientApp.createOfflineModel(modelName, ['label'])
+
+         // Add directly to Dexie to simulate records with various score values
+         await model.db.values.add({ uid: 'null-score', label: 'null', score: null })
+         await model.db.values.add({ uid: 'five-score', label: 'five', score: 5 })
+
+         // score=null should NOT match { lte: 10 } even though (null coerced to 0) <= 10
+         const results = await model.findWhere({ score: { lte: 10 } })
+         const uids = results.map(r => r.uid)
+
+         assert.ok(!uids.includes('null-score'), 'null score must NOT match { lte: 10 } (SQL NULL behaviour)')
+         assert.ok( uids.includes('five-score'), 'score=5 must match { lte: 10 }')
+      } finally {
+         await cleanup()
+      }
+   })
+
    test('wherePredicate range check excludes records whose field is absent (undefined)', async () => {
       // Comparing undefined with a number via >, <, >=, <= always returns false in JS
       // (undefined coerces to NaN, and NaN comparisons are always false).  So none of

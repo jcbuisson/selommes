@@ -616,10 +616,12 @@ function wherePredicate(where) {
 
          } else if (typeof(value) === 'object') {
             // 'attr = { lt/lte/gt/gte: value }' clause — all bounds apply.
-            // A missing field (undefined) never satisfies a range: JS comparisons
-            // with NaN are all false so the guards below would not fire.  Exclude
-            // records with no such field explicitly, consistent with SQL NULL behaviour.
-            if (eltAttrValue === undefined) return false
+            // A missing (undefined) or null field never satisfies a range constraint,
+            // consistent with SQL NULL behaviour (NULL op anything = NULL = unknown).
+            // JS coerces null → 0 so range guards like `null > 10` silently pass;
+            // undefined coerces to NaN and all NaN comparisons return false — both
+            // must be excluded explicitly.
+            if (eltAttrValue === undefined || eltAttrValue === null) return false
             if ('lte' in value && eltAttrValue > value.lte) return false
             if ('lt'  in value && eltAttrValue >= value.lt)  return false
             if ('gte' in value && eltAttrValue < value.gte)  return false
