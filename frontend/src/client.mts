@@ -466,11 +466,7 @@ export function offlinePlugin(app) {
                await app.service(modelName).updateWithMeta(elt.uid, fullValue, meta.updated_at)
             } catch(err) {
                console.log("*** err sync user updateDatabase", err)
-               // rollback
-               const previousDatabaseValue = await app.service(modelName).findUnique({ where:{ uid: elt.uid }})
-               const previousDatabaseMetadata = await app.service('metadata').findUnique({ where:{ uid: elt.uid }})
-               await idbValues.update(elt.uid, previousDatabaseValue)
-               await idbMetadata.update(elt.uid, previousDatabaseMetadata)
+               // Leave client's local version intact; it will be retried on the next sync.
             }
          }
       } catch(err) {

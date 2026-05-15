@@ -300,6 +300,47 @@ describe('Full client ↔ server protocol', () => {
       }
    })
 
+   test('one failed updateWithMeta does not abort remaining updateDatabase entries', async () => {
+      const modelName = `model${++dbCounter}`
+      const serverUpdated = {}
+
+      const { clientApp, cleanup } = await createTestContext(serverApp => {
+         serverApp.createService('sync', {
+            // Tell the client both u1 and u2 need to be pushed (client is newer for both)
+            go: async (mn, where, cutoff, clientMetadataDict) => ({
+               addClient: [], updateClient: [], deleteClient: [], addDatabase: [],
+               updateDatabase: [ clientMetadataDict['u1'], clientMetadataDict['u2'] ],
+            }),
+         })
+         serverApp.createService(modelName, {
+            updateWithMeta: async (uid, data) => {
+               if (uid === 'u1') throw new Error('server rejected u1')
+               serverUpdated[uid] = data  // u2 succeeds
+            },
+            createWithMeta: async () => {},
+            deleteWithMeta: async () => {},
+            findUnique:     async () => null,
+            findMany:       async () => [],
+         })
+      }, { useOfflinePlugin: true })
+
+      try {
+         const model = clientApp.createOfflineModel(modelName, ['label'])
+         await model.db.values.add({ uid: 'u1', label: 'new-u1' })
+         await model.db.metadata.add({ uid: 'u1', created_at: T0, updated_at: T2 })
+         await model.db.values.add({ uid: 'u2', label: 'new-u2' })
+         await model.db.metadata.add({ uid: 'u2', created_at: T0, updated_at: T2 })
+         await model.addSynchroWhere({})
+         await model.synchronizeAll()
+
+         // u2's push must succeed even though u1's updateWithMeta threw
+         assert.ok(serverUpdated['u2'], 'u2 should be pushed to server despite u1 failure')
+         assert.equal(serverUpdated['u2'].label, 'new-u2')
+      } finally {
+         await cleanup()
+      }
+   })
+
    test('record in both, client newer → server is updated via socket', async () => {
       const modelName = `model${++dbCounter}`
       const { db, metaTable, modelTable } = await createTestDb(modelName)
