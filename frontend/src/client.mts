@@ -448,8 +448,14 @@ export function offlinePlugin(app) {
 
          // 4- create elements of `addDatabase` with full data from cache
          for (const elt of addDatabase) {
+            // elt.uid is undefined when the clientMetadataDict fallback {} was used
+            // (record exists in idbValues but metadata is missing).  Guard before the
+            // get() call: idbValues.get(undefined) itself throws before fullValue is
+            // assigned, so checking fullValue == null afterwards is too late.
+            if (elt.uid == null) continue
             const fullValue = await idbValues.get(elt.uid)
             const meta = await idbMetadata.get(elt.uid)
+            if (fullValue == null) continue  // record deleted concurrently
             delete fullValue.uid
             delete fullValue.__deleted__
             try {
@@ -464,8 +470,10 @@ export function offlinePlugin(app) {
 
          // 5- update elements of `updateDatabase` with full data from cache
          for (const elt of updateDatabase) {
+            if (elt.uid == null) continue
             const fullValue = await idbValues.get(elt.uid)
             const meta = await idbMetadata.get(elt.uid)
+            if (fullValue == null) continue  // record deleted concurrently
             delete fullValue.uid
             delete fullValue.__deleted__
             try {

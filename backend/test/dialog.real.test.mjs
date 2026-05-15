@@ -479,6 +479,46 @@ describe('Full client ↔ server protocol', () => {
       await new Promise(resolve => serverApp2.httpServer.close(resolve))
    })
 
+   test('addDatabase TypeError on missing fullValue does not abort remaining entries', async () => {
+      // delete fullValue.uid and delete fullValue.__deleted__ are OUTSIDE the inner
+      // try/catch in steps 4 and 5 of synchronize().  If idbValues.get(elt.uid)
+      // returns undefined — because elt.uid is itself undefined (the clientMetadataDict
+      // fallback {} has no uid property when metadata is missing) or because the record
+      // was deleted from Dexie concurrently — the `delete undefined.uid` throws a
+      // TypeError that escapes to the outer try/catch, aborting the entire sync and
+      // silently skipping every remaining addDatabase / updateDatabase entry.
+      const modelName = `model${++dbCounter}`
+      const { db, metaTable, modelTable } = await createTestDb(modelName)
+
+      const { clientApp, cleanup } = await createTestContext(
+         serverApp => serverApp.configure(drizzleOfflinePlugin, db, metaTable, [modelTable]),
+         { useOfflinePlugin: true },
+      )
+
+      try {
+         const model = clientApp.createOfflineModel(modelName, ['label'])
+
+         // a1: value exists in Dexie but metadata is MISSING → synchronize builds
+         //     clientMetadataDict['a1'] = {} (the "should not happen" fallback)
+         //     → computeSyncResult puts {} into addDatabase (elt.uid = undefined)
+         //     → delete undefined.uid throws → outer catch → sync aborts
+         await model.db.values.add({ uid: 'a1', label: 'no-meta' })
+         // a2: normal record with both value and metadata
+         await model.db.values.add({ uid: 'a2', label: 'normal' })
+         await model.db.metadata.add({ uid: 'a2', created_at: T0 })
+
+         await model.addSynchroWhere({})
+         await model.synchronizeAll()
+
+         // a2 must be pushed despite the corrupted a1 entry aborting processing for it
+         const rows = await db.select().from(modelTable)
+         assert.ok(rows.find(r => r.uid === 'a2'),
+            'a2 must be pushed to the server even though a1 has missing metadata')
+      } finally {
+         await cleanup()
+      }
+   })
+
    test('wherePredicate range check excludes records whose field is null', async () => {
       // The previous fix excluded undefined (NaN comparisons) but missed null.
       // JS coerces null → 0 for numeric comparisons, so for { score: { lte: 10 } }:
