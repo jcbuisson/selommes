@@ -158,7 +158,7 @@ export function createClient(socket, options={}) {
       addConnectListener,
       removeConnectListener,
       addDisconnectListener,
-      removeDisonnectListener,
+      removeDisconnectListener,
       addErrorListener,
       removeErrorListener,
    
