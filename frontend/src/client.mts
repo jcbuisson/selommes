@@ -55,7 +55,7 @@ export function createClient(socket, options={}) {
    function addDisconnectListener(func) {
       disconnectListeners.push(func)
    }
-   function removeDisonnectListener(func) {
+   function removeDisconnectListener(func) {
       disconnectListeners = disconnectListeners.filter(f => f !== func)
    }
 

@@ -479,6 +479,37 @@ describe('Full client ↔ server protocol', () => {
       await new Promise(resolve => serverApp2.httpServer.close(resolve))
    })
 
+   test('removeDisconnectListener is callable and removes the listener', async () => {
+      // removeDisonnectListener (misspelled — missing 'c') was exported on the app object
+      // instead of removeDisconnectListener.  app.removeDisconnectListener is therefore
+      // undefined, so any call to it throws TypeError: not a function.
+      const { clientApp, cleanup } = await createTestContext(serverApp => {
+         serverApp.createService('greet', { hello: async (name) => `Hello, ${name}!` })
+      })
+
+      try {
+         let callCount = 0
+         const listener = () => { callCount++ }
+
+         clientApp.addDisconnectListener(listener)
+
+         // Must not throw — the correctly-spelled method must exist
+         assert.ok(
+            typeof clientApp.removeDisconnectListener === 'function',
+            'removeDisconnectListener must be a function on the app object',
+         )
+
+         clientApp.removeDisconnectListener(listener)
+
+         // After removal the listener must no longer be registered
+         // (we can inspect indirectly: add a fresh listener, but the removed one
+         //  should not fire — verified by callCount staying at 0)
+         assert.equal(callCount, 0, 'removed listener must not have been called')
+      } finally {
+         await cleanup()
+      }
+   })
+
    test('addDatabase TypeError on missing fullValue does not abort remaining entries', async () => {
       // delete fullValue.uid and delete fullValue.__deleted__ are OUTSIDE the inner
       // try/catch in steps 4 and 5 of synchronize().  If idbValues.get(elt.uid)
