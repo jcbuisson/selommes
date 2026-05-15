@@ -121,23 +121,23 @@ export function drizzleOfflinePlugin(app, db, metadata, models) {
          },
          
          createWithMeta: async (uid, data, created_at) => {
-            db.transaction(async (tx) => {
+            return await db.transaction(async (tx) => {
                const value = await tx.insert(model).values({ uid, ...data }).returning();
                const meta = await tx.insert(metadata).values({ uid, created_at }).returning();
                return [value, meta]
             })
          },
-         
+
          updateWithMeta: async (uid, data, updated_at) => {
-            db.transaction(async (tx) => {
+            return await db.transaction(async (tx) => {
                const value = await tx.update(model).set(data).where(eq(model.uid, uid)).returning();
                const meta = await tx.update(metadata).set({ updated_at }).where(eq(metadata.uid, uid)).returning();
                return [value, meta]
             })
          },
-         
+
          deleteWithMeta: async (uid, deleted_at) => {
-            db.transaction(async (tx) => {
+            return await db.transaction(async (tx) => {
                const value = await tx.delete(model).where(eq(model.uid, uid)).returning();
                const meta = await tx.update(metadata).set({ deleted_at }).where(eq(metadata.uid, uid)).returning();
                return [value, meta]

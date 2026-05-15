@@ -4,24 +4,54 @@ import 'fake-indexeddb/auto'
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { io as ioc } from 'socket.io-client'
+import { PGlite } from '@electric-sql/pglite'
+import { drizzle } from 'drizzle-orm/pglite'
+import { pgTable, text, date } from 'drizzle-orm/pg-core'
+import { eq } from 'drizzle-orm'
 
 import { createClient, offlinePlugin } from '../../frontend/src/client.mts'
 import { expressX } from '#root/src/server.mjs'
-import { runSync } from '#root/src/drizzle-plugins.mjs'
+import { drizzleOfflinePlugin } from '#root/src/drizzle-plugins.mjs'
 
 const T0 = new Date('2026-01-01T00:00:00Z')
 const T1 = new Date('2026-01-02T00:00:00Z')
 const T2 = new Date('2026-01-03T00:00:00Z')
 
-function matchesWhere(value, where) {
-   return Object.entries(where).every(([k, v]) => value[k] === v)
-}
-
 let dbCounter = 0
 
-// ─── Test context helper ───────────────────────────────────────────────────────
-// Starts a real expressX server, connects a real socket.io client, and wires up
-// createClient (+ optionally offlinePlugin). Returns cleanup().
+// ─── In-memory DB helper ──────────────────────────────────────────────────────
+// Each test gets a fresh PGlite instance with a unique model table so tests
+// are fully isolated. Model names use underscores (PG-safe identifiers).
+
+async function createTestDb(modelName) {
+   const pglite = new PGlite()
+   await pglite.exec(`
+      CREATE TABLE metadata (
+         uid TEXT PRIMARY KEY,
+         created_at DATE,
+         updated_at DATE,
+         deleted_at DATE
+      );
+      CREATE TABLE "${modelName}" (
+         uid TEXT PRIMARY KEY,
+         label TEXT NOT NULL
+      );
+   `)
+   const db = drizzle(pglite)
+   const metaTable = pgTable('metadata', {
+      uid: text('uid').primaryKey(),
+      created_at: date(),
+      updated_at: date(),
+      deleted_at: date(),
+   })
+   const modelTable = pgTable(modelName, {
+      uid: text('uid').primaryKey(),
+      label: text('label').notNull(),
+   })
+   return { db, metaTable, modelTable }
+}
+
+// ─── Test context helper ──────────────────────────────────────────────────────
 
 async function createTestContext(registerServices, { useOfflinePlugin = false } = {}) {
    const serverApp = expressX({})
@@ -49,7 +79,7 @@ async function createTestContext(registerServices, { useOfflinePlugin = false } 
       serverApp.httpServer.close(resolve)
    })
 
-   return { serverApp, clientApp, cleanup }
+   return { clientApp, cleanup }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -92,37 +122,16 @@ describe('Full client ↔ server protocol', () => {
    })
 
    test('sync.go through socket: server records pulled into real Dexie', async () => {
-      const modelName    = `sock-${++dbCounter}`
-      const serverValues = { r1: { uid: 'r1', label: 'Vacances' } }
-      const serverMeta   = { r1: { uid: 'r1', created_at: T0 } }
+      const modelName = `model${++dbCounter}`
+      const { db, metaTable, modelTable } = await createTestDb(modelName)
 
-      const { clientApp, cleanup } = await createTestContext(serverApp => {
-         serverApp.createService('sync', {
-            go: async (mn, where, _cutoff, clientMetadataDict) => {
-               const dbValuesDict = Object.fromEntries(
-                  Object.entries(serverValues).filter(([, v]) => matchesWhere(v, where))
-               )
-               return runSync(
-                  dbValuesDict,
-                  clientMetadataDict,
-                  uid => Promise.resolve(serverMeta[uid] ?? null),
-                  async () => {},
-               )
-            },
-         })
-         serverApp.createService(modelName, {
-            findUnique: async ({ where: { uid } = {} } = {}) =>
-               serverValues[uid] ? structuredClone(serverValues[uid]) : null,
-            createWithMeta: async (uid, data, created_at) => {
-               serverValues[uid] = { uid, ...data }
-               serverMeta[uid]   = { uid, created_at }
-            },
-            updateWithMeta: async (uid, data, updated_at) => {
-               if (serverValues[uid]) Object.assign(serverValues[uid], data)
-               if (serverMeta[uid])   serverMeta[uid].updated_at = updated_at
-            },
-         })
-      }, { useOfflinePlugin: true })
+      await db.insert(modelTable).values({ uid: 'r1', label: 'Vacances' })
+      await db.insert(metaTable).values({ uid: 'r1', created_at: '2026-01-01' })
+
+      const { clientApp, cleanup } = await createTestContext(
+         serverApp => serverApp.configure(drizzleOfflinePlugin, db, metaTable, [modelTable]),
+         { useOfflinePlugin: true },
+      )
 
       try {
          const model = clientApp.createOfflineModel(modelName, ['label'])
@@ -138,24 +147,13 @@ describe('Full client ↔ server protocol', () => {
    })
 
    test('sync.go through socket: local Dexie record pushed to server', async () => {
-      const modelName    = `sock-${++dbCounter}`
-      const serverValues = {}
-      const serverMeta   = {}
+      const modelName = `model${++dbCounter}`
+      const { db, metaTable, modelTable } = await createTestDb(modelName)
 
-      const { clientApp, cleanup } = await createTestContext(serverApp => {
-         serverApp.createService('sync', {
-            go: async (mn, where, _cutoff, clientMetadataDict) =>
-               runSync({}, clientMetadataDict, () => Promise.resolve(null), async () => {}),
-         })
-         serverApp.createService(modelName, {
-            findUnique:     async () => null,
-            createWithMeta: async (uid, data, created_at) => {
-               serverValues[uid] = { uid, ...data }
-               serverMeta[uid]   = { uid, created_at }
-            },
-            updateWithMeta: async () => {},
-         })
-      }, { useOfflinePlugin: true })
+      const { clientApp, cleanup } = await createTestContext(
+         serverApp => serverApp.configure(drizzleOfflinePlugin, db, metaTable, [modelTable]),
+         { useOfflinePlugin: true },
+      )
 
       try {
          const model = clientApp.createOfflineModel(modelName, ['label'])
@@ -164,28 +162,22 @@ describe('Full client ↔ server protocol', () => {
          await model.addSynchroWhere({})
          await model.synchronizeAll()
 
-         assert.ok(serverValues['x1'], 'server should have received the pushed record')
-         assert.equal(serverValues['x1'].label, 'Formation')
+         const rows = await db.select().from(modelTable).where(eq(modelTable.uid, 'x1'))
+         assert.ok(rows.length > 0, 'server should have received the pushed record')
+         assert.equal(rows[0].label, 'Formation')
       } finally {
          await cleanup()
       }
    })
 
    test('record only on client, deleted → ignored on both sides', async () => {
-      const modelName    = `sock-${++dbCounter}`
-      const serverValues = {}
+      const modelName = `model${++dbCounter}`
+      const { db, metaTable, modelTable } = await createTestDb(modelName)
 
-      const { clientApp, cleanup } = await createTestContext(serverApp => {
-         serverApp.createService('sync', {
-            go: async (mn, where, _cutoff, clientMetadataDict) =>
-               runSync({}, clientMetadataDict, () => Promise.resolve(null), async () => {}),
-         })
-         serverApp.createService(modelName, {
-            findUnique:     async () => null,
-            createWithMeta: async (uid, data, created_at) => { serverValues[uid] = { uid, ...data } },
-            updateWithMeta: async () => {},
-         })
-      }, { useOfflinePlugin: true })
+      const { clientApp, cleanup } = await createTestContext(
+         serverApp => serverApp.configure(drizzleOfflinePlugin, db, metaTable, [modelTable]),
+         { useOfflinePlugin: true },
+      )
 
       try {
          const model = clientApp.createOfflineModel(modelName, ['label'])
@@ -194,7 +186,8 @@ describe('Full client ↔ server protocol', () => {
          await model.addSynchroWhere({})
          await model.synchronizeAll()
 
-         assert.ok(!serverValues['d1'], 'server should not have the deleted-only record')
+         const rows = await db.select().from(modelTable)
+         assert.ok(!rows.find(r => r.uid === 'd1'), 'server should not have the deleted-only record')
          const d1 = await model.db.values.get('d1')
          assert.ok(!d1, 'Dexie should no longer hold the deleted record')
       } finally {
@@ -203,33 +196,16 @@ describe('Full client ↔ server protocol', () => {
    })
 
    test('record in both, client newer → server is updated via socket', async () => {
-      const modelName    = `sock-${++dbCounter}`
-      const serverValues = { u1: { uid: 'u1', label: 'old' } }
-      const serverMeta   = { u1: { uid: 'u1', created_at: T0, updated_at: T1 } }
+      const modelName = `model${++dbCounter}`
+      const { db, metaTable, modelTable } = await createTestDb(modelName)
 
-      const { clientApp, cleanup } = await createTestContext(serverApp => {
-         serverApp.createService('sync', {
-            go: async (mn, where, _cutoff, clientMetadataDict) => {
-               const dbValuesDict = Object.fromEntries(
-                  Object.entries(serverValues).filter(([, v]) => matchesWhere(v, where))
-               )
-               return runSync(
-                  dbValuesDict,
-                  clientMetadataDict,
-                  uid => Promise.resolve(serverMeta[uid] ?? null),
-                  async () => {},
-               )
-            },
-         })
-         serverApp.createService(modelName, {
-            findUnique:     async () => null,
-            createWithMeta: async () => {},
-            updateWithMeta: async (uid, data, updated_at) => {
-               if (serverValues[uid]) Object.assign(serverValues[uid], data)
-               if (serverMeta[uid])   serverMeta[uid].updated_at = updated_at
-            },
-         })
-      }, { useOfflinePlugin: true })
+      await db.insert(modelTable).values({ uid: 'u1', label: 'old' })
+      await db.insert(metaTable).values({ uid: 'u1', created_at: '2026-01-01', updated_at: '2026-01-02' })
+
+      const { clientApp, cleanup } = await createTestContext(
+         serverApp => serverApp.configure(drizzleOfflinePlugin, db, metaTable, [modelTable]),
+         { useOfflinePlugin: true },
+      )
 
       try {
          const model = clientApp.createOfflineModel(modelName, ['label'])
@@ -238,7 +214,8 @@ describe('Full client ↔ server protocol', () => {
          await model.addSynchroWhere({})
          await model.synchronizeAll()
 
-         assert.equal(serverValues['u1'].label, 'new', 'server should have the updated label')
+         const rows = await db.select().from(modelTable).where(eq(modelTable.uid, 'u1'))
+         assert.equal(rows[0].label, 'new', 'server should have the updated label')
          const clientValue = await model.db.values.get('u1')
          assert.equal(clientValue.label, 'new', 'client Dexie should be unchanged')
       } finally {
