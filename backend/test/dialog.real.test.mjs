@@ -71,7 +71,7 @@ function createMockServer(socket) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('mocked socket: createClient ↔ server protocol', () => {
+describe('Full client ↔ server protocol', () => {
 
    test('service call is routed through client-request / client-response', async () => {
       const { clientSocket, serverSocket } = createMockSocketPair()

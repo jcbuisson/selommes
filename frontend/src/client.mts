@@ -49,21 +49,21 @@ export function createClient(socket, options={}) {
       connectListeners.push(func)
    }
    function removeConnectListener(func) {
-      connectListeners = connectListeners.filter(f !== func)
+      connectListeners = connectListeners.filter(f => f !== func)
    }
 
    function addDisconnectListener(func) {
       disconnectListeners.push(func)
    }
    function removeDisonnectListener(func) {
-      disconnectListeners = disconnectListeners.filter(f !== func)
+      disconnectListeners = disconnectListeners.filter(f => f !== func)
    }
 
    function addErrorListener(func) {
       errorListeners.push(func)
    }
    function removeErrorListener(func) {
-      errorListeners = errorListeners.filter(f !== func)
+      errorListeners = errorListeners.filter(f => f !== func)
    }
 
    // on receiving response from service request
@@ -99,7 +99,7 @@ export function createClient(socket, options={}) {
                delete waitingPromisesByUid[uid]
                reject(`Error: timeout on service '${name}', action '${action}', args: ${JSON.stringify(args)}`)
             }, serviceOptions.timeout)
-            timer.unref(); // so it doesn't prevent process exit (Claude)
+            if (timer.unref) timer.unref(); // so it doesn't prevent process exit for tests (Node.js only — no-op in browsers)
          }
       })
       // send request to server through websocket
@@ -167,6 +167,36 @@ export function createClient(socket, options={}) {
    }
 
    return app
+}
+
+
+//////////////////////////       RELOAD PLUGIN       //////////////////////////
+// Enrich `app` with listeners handling socket data transfer on page reload
+
+export async function reloadPlugin(app) {
+
+   const cnxid = useSessionStorage('cnxid', '')
+
+   app.addConnectListener(async (socket) => {
+      const socketId = socket.id
+      console.log('connect', socketId)
+      const prevSocketId = cnxid.value
+      if (prevSocketId) {
+         console.log('cnx-transfer', prevSocketId, 'to', socketId)
+         await socket.emit('cnx-transfer', prevSocketId, socketId)
+         cnxid.value = socketId
+      } else {
+         cnxid.value = socketId
+      }
+
+      socket.on('cnx-transfer-ack', async (fromSocketId, toSocketId) => {
+         console.log('ACK ACK!!!', fromSocketId, toSocketId)
+      })
+
+      socket.on('cnx-transfer-error', async (fromSocketId, toSocketId) => {
+         console.log('ERR ERR!!!', fromSocketId, toSocketId)
+      })
+   })
 }
 
 
