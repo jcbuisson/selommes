@@ -102,10 +102,15 @@ export function drizzleOfflinePlugin(app, db, metadata, models) {
          createWithMeta: async (uid, data, created_at) => {
             const ts = new Date(created_at)
             return await db.transaction(async (tx) => {
-               const [value] = await tx.insert(model).values({ uid, ...data }).returning();
-               // Upsert: if a metadata row already exists (left over from a previous
-               // deleteWithMeta which hard-deletes the model row but keeps metadata),
-               // clear deleted_at/updated_at so the record is active again.
+               // Upsert: if the model row already exists (e.g. a concurrent createWithMeta
+               // from the direct create() path landed before the sync's addDatabase step),
+               // update it instead of throwing a PK conflict that would rollback the
+               // client's Dexie record.
+               const [value] = await tx.insert(model)
+                  .values({ uid, ...data })
+                  .onConflictDoUpdate({ target: model.uid, set: data })
+                  .returning();
+               // Upsert metadata: handles re-creation after a prior deleteWithMeta.
                const [meta] = await tx.insert(metadata)
                   .values({ uid, created_at: ts })
                   .onConflictDoUpdate({
