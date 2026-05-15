@@ -479,6 +479,53 @@ describe('Full client ↔ server protocol', () => {
       await new Promise(resolve => serverApp2.httpServer.close(resolve))
    })
 
+   test('addSynchroWhere with range-operator where does not log ConstraintError when already covered', async () => {
+      // isSubset uses !== (reference equality) for all values.  For primitive where
+      // values (strings, numbers) this is fine.  For object values like { gte: 1 },
+      // two structurally identical objects from different call sites have different
+      // references, so isSubset returns false even though the where is already in the
+      // list.  addSynchroDBWhere then calls whereDb.add on an already-existing key →
+      // ConstraintError → caught and logged.  modified=false for the wrong reason.
+      // In a real browser with persistent IndexedDB the error fires on every page load.
+      const modelName = `model${++dbCounter}`
+      const pglite = new PGlite()
+      await pglite.exec(`
+         CREATE TABLE metadata (uid TEXT PRIMARY KEY, created_at TIMESTAMP, updated_at TIMESTAMP, deleted_at TIMESTAMP);
+         CREATE TABLE "${modelName}" (uid TEXT PRIMARY KEY, label TEXT NOT NULL, score INTEGER NOT NULL);
+      `)
+      const db = drizzle(pglite)
+      const metaTable = pgTable('metadata', { uid: text('uid').primaryKey(), created_at: timestamp(), updated_at: timestamp(), deleted_at: timestamp() })
+      const modelTable = pgTable(modelName, { uid: text('uid').primaryKey(), label: text('label').notNull(), score: integer('score').notNull() })
+
+      const { clientApp, cleanup } = await createTestContext(
+         serverApp => serverApp.configure(drizzleOfflinePlugin, db, metaTable, [modelTable]),
+         { useOfflinePlugin: true },
+      )
+
+      try {
+         const model = clientApp.createOfflineModel(modelName, ['label'])
+
+         // Intercept console.log to detect spurious ConstraintError logs
+         const errorLogs = []
+         const origLog = console.log
+         console.log = (...args) => {
+            if (typeof args[0] === 'string' && args[0].startsWith('err addSynchroDBWhere')) errorLogs.push(args)
+            origLog(...args)
+         }
+
+         try {
+            await model.addSynchroWhere({ score: { gte: 1 } })  // first call: adds to list
+            await model.addSynchroWhere({ score: { gte: 1 } })  // second call: should be detected as already covered
+            assert.equal(errorLogs.length, 0,
+               'adding a where already in the list must not throw a ConstraintError')
+         } finally {
+            console.log = origLog
+         }
+      } finally {
+         await cleanup()
+      }
+   })
+
    test('compound range { gte, lte } filters consistently on both client and server', async () => {
       // wherePredicate applies `lte` first (else-if chain); whereToDrizzleFilters applies
       // `gte` first (return on first match). For { gte:1, lte:10 } this means:

@@ -627,9 +627,17 @@ function wherePredicate(where) {
 }
 
 function isSubset(subset, fullObject) {
-   // return Object.entries(subset).some(([key, value]) => fullObject[key] === value)
    for (const key in fullObject) {
-      if (fullObject[key] !== subset[key]) return false
+      const fVal = fullObject[key]
+      const sVal = subset[key]
+      // Primitive values: use reference/value equality (works for string, number, boolean).
+      // Object values (e.g. range operators { gte: 1 }): use structural equality via
+      // sorted JSON so that two freshly-created identical objects compare as equal.
+      if (typeof fVal === 'object' && fVal !== null) {
+         if (stringifyWithSortedKeys(fVal) !== stringifyWithSortedKeys(sVal)) return false
+      } else {
+         if (fVal !== sVal) return false
+      }
    }
    return true
 }
