@@ -479,6 +479,39 @@ describe('Full client ↔ server protocol', () => {
       await new Promise(resolve => serverApp2.httpServer.close(resolve))
    })
 
+   test('wherePredicate handles falsy boundary value (lte: 0) correctly', async () => {
+      // wherePredicate is used by synchronize() to build clientMetadataDict.
+      // A falsy boundary (lte: 0) is checked with `if (value.lte)` which treats 0
+      // as "not set", causing ALL records to pass — wrong records enter clientMetadataDict
+      // and the sync pushes them to the server where they fail with PK conflicts,
+      // then the rollback deletes them from Dexie (data loss).
+      const modelName = `model${++dbCounter}`
+      const { db, metaTable, modelTable } = await createTestDb(modelName)
+
+      const { clientApp, cleanup } = await createTestContext(
+         serverApp => serverApp.configure(drizzleOfflinePlugin, db, metaTable, [modelTable]),
+         { useOfflinePlugin: true },
+      )
+
+      try {
+         const model = clientApp.createOfflineModel(modelName, ['label'])
+
+         // Dexie stores arbitrary fields — score is not indexed but is queryable
+         await model.db.values.add({ uid: 'pos',  label: 'positive', score:  5 })
+         await model.db.values.add({ uid: 'neg',  label: 'negative', score: -3 })
+         await model.db.values.add({ uid: 'zero', label: 'zero',     score:  0 })
+
+         const results = await model.findWhere({ score: { lte: 0 } })
+         const uids = results.map(r => r.uid)
+
+         assert.ok(!uids.includes('pos'),  'score=5  should NOT match { lte: 0 }')
+         assert.ok( uids.includes('neg'),  'score=-3 should match { lte: 0 }')
+         assert.ok( uids.includes('zero'), 'score=0  should match { lte: 0 }')
+      } finally {
+         await cleanup()
+      }
+   })
+
    test('pub/sub createWithMeta event correctly updates a second client\'s Dexie', async () => {
       const modelName = `model${++dbCounter}`
       const { db, metaTable, modelTable } = await createTestDb(modelName)

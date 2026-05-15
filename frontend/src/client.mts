@@ -604,15 +604,15 @@ function wherePredicate(where) {
             // 'attr = value' clause
             if (eltAttrValue !== value) return false
 
-         } else if (typeof(value) === 'object') {
+         } else if (typeof(value) === 'object' && value !== null) {
             // 'attr = { lt/lte/gt/gte: value }' clause
-            if (value.lte) {
+            if ('lte' in value) {
                if (eltAttrValue > value.lte) return false
-            } else if (value.lt) {
+            } else if ('lt' in value) {
                if (eltAttrValue >= value.lt) return false
-            } else if (value.gte) {
+            } else if ('gte' in value) {
                if (eltAttrValue < value.gte) return false
-            } else if (value.gt) {
+            } else if ('gt' in value) {
                if (eltAttrValue <= value.gt) return false
             }
          }
