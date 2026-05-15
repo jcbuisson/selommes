@@ -1,10 +1,10 @@
-import { pgTable, uuid, text, date } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp } from "drizzle-orm/pg-core";
 
 export const metadata = pgTable("metadata", {
    uid: uuid("uid").defaultRandom().primaryKey(),
-   created_at: date(),
-   updated_at: date(),
-   deleted_at: date(),
+   created_at: timestamp(),
+   updated_at: timestamp(),
+   deleted_at: timestamp(),
 })
 
 export const user = pgTable("user", {

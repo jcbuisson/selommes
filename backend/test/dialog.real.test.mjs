@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 import { io as ioc } from 'socket.io-client'
 import { PGlite } from '@electric-sql/pglite'
 import { drizzle } from 'drizzle-orm/pglite'
-import { pgTable, text, date } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp } from 'drizzle-orm/pg-core'
 import { eq } from 'drizzle-orm'
 
 import { createClient, offlinePlugin } from '../../frontend/src/client.mts'
@@ -30,9 +30,9 @@ async function createTestDb(modelName) {
    await pglite.exec(`
       CREATE TABLE metadata (
          uid TEXT PRIMARY KEY,
-         created_at DATE,
-         updated_at DATE,
-         deleted_at DATE
+         created_at TIMESTAMP,
+         updated_at TIMESTAMP,
+         deleted_at TIMESTAMP
       );
       CREATE TABLE "${modelName}" (
          uid TEXT PRIMARY KEY,
@@ -42,9 +42,9 @@ async function createTestDb(modelName) {
    const db = drizzle(pglite)
    const metaTable = pgTable('metadata', {
       uid: text('uid').primaryKey(),
-      created_at: date(),
-      updated_at: date(),
-      deleted_at: date(),
+      created_at: timestamp(),
+      updated_at: timestamp(),
+      deleted_at: timestamp(),
    })
    const modelTable = pgTable(modelName, {
       uid: text('uid').primaryKey(),
@@ -128,7 +128,7 @@ describe('Full client ↔ server protocol', () => {
       const { db, metaTable, modelTable } = await createTestDb(modelName)
 
       await db.insert(modelTable).values({ uid: 'r1', label: 'Vacances' })
-      await db.insert(metaTable).values({ uid: 'r1', created_at: '2026-01-01' })
+      await db.insert(metaTable).values({ uid: 'r1', created_at: T0 })
 
       const { clientApp, cleanup } = await createTestContext(
          serverApp => serverApp.configure(drizzleOfflinePlugin, db, metaTable, [modelTable]),
@@ -272,7 +272,7 @@ describe('Full client ↔ server protocol', () => {
 
       // Server has s1 at T2 (newer than client)
       await db.insert(modelTable).values({ uid: 's1', label: 'server-v2' })
-      await db.insert(metaTable).values({ uid: 's1', created_at: '2026-01-01', updated_at: '2026-01-03' })
+      await db.insert(metaTable).values({ uid: 's1', created_at: T0, updated_at: T2 })
 
       const { clientApp, cleanup } = await createTestContext(
          serverApp => serverApp.configure(drizzleOfflinePlugin, db, metaTable, [modelTable]),
@@ -305,7 +305,7 @@ describe('Full client ↔ server protocol', () => {
       const { db, metaTable, modelTable } = await createTestDb(modelName)
 
       await db.insert(modelTable).values({ uid: 'u1', label: 'old' })
-      await db.insert(metaTable).values({ uid: 'u1', created_at: '2026-01-01', updated_at: '2026-01-02' })
+      await db.insert(metaTable).values({ uid: 'u1', created_at: T0, updated_at: T1 })
 
       const { clientApp, cleanup } = await createTestContext(
          serverApp => serverApp.configure(drizzleOfflinePlugin, db, metaTable, [modelTable]),
@@ -334,12 +334,12 @@ describe('Full client ↔ server protocol', () => {
 
       // r1 exists on server initially
       await db.insert(modelTable).values({ uid: 'r1', label: 'original' })
-      await db.insert(metaTable).values({ uid: 'r1', created_at: '2026-01-01' })
+      await db.insert(metaTable).values({ uid: 'r1', created_at: T0 })
 
       // Server-side delete while client was offline: hard-delete from model table,
       // but metadata row stays with deleted_at set (this is what deleteWithMeta does)
       await db.delete(modelTable).where(eq(modelTable.uid, 'r1'))
-      await db.update(metaTable).set({ deleted_at: '2026-01-02' }).where(eq(metaTable.uid, 'r1'))
+      await db.update(metaTable).set({ deleted_at: T1 }).where(eq(metaTable.uid, 'r1'))
 
       const { clientApp, cleanup } = await createTestContext(
          serverApp => serverApp.configure(drizzleOfflinePlugin, db, metaTable, [modelTable]),

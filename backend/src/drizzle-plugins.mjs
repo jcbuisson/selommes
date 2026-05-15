@@ -100,16 +100,17 @@ export function drizzleOfflinePlugin(app, db, metadata, models) {
          },
          
          createWithMeta: async (uid, data, created_at) => {
+            const ts = new Date(created_at)
             return await db.transaction(async (tx) => {
                const value = await tx.insert(model).values({ uid, ...data }).returning();
                // Upsert: if a metadata row already exists (left over from a previous
                // deleteWithMeta which hard-deletes the model row but keeps metadata),
                // clear deleted_at/updated_at so the record is active again.
                const meta = await tx.insert(metadata)
-                  .values({ uid, created_at })
+                  .values({ uid, created_at: ts })
                   .onConflictDoUpdate({
                      target: metadata.uid,
-                     set: { created_at, deleted_at: null, updated_at: null },
+                     set: { created_at: ts, deleted_at: null, updated_at: null },
                   })
                   .returning();
                return [value, meta]
@@ -119,7 +120,7 @@ export function drizzleOfflinePlugin(app, db, metadata, models) {
          updateWithMeta: async (uid, data, updated_at) => {
             return await db.transaction(async (tx) => {
                const value = await tx.update(model).set(data).where(eq(model.uid, uid)).returning();
-               const meta = await tx.update(metadata).set({ updated_at }).where(eq(metadata.uid, uid)).returning();
+               const meta = await tx.update(metadata).set({ updated_at: new Date(updated_at) }).where(eq(metadata.uid, uid)).returning();
                return [value, meta]
             })
          },
@@ -127,7 +128,7 @@ export function drizzleOfflinePlugin(app, db, metadata, models) {
          deleteWithMeta: async (uid, deleted_at) => {
             return await db.transaction(async (tx) => {
                const value = await tx.delete(model).where(eq(model.uid, uid)).returning();
-               const meta = await tx.update(metadata).set({ deleted_at }).where(eq(metadata.uid, uid)).returning();
+               const meta = await tx.update(metadata).set({ deleted_at: new Date(deleted_at) }).where(eq(metadata.uid, uid)).returning();
                return [value, meta]
             })
          },

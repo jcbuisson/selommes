@@ -69,6 +69,18 @@ describe('computeSyncResult', () => {
       assert.deepEqual(result.updateDatabase, [])
    })
 
+   test('sub-day timestamp matches its day-truncated DB counterpart → no action', () => {
+      // The DB stores TIMESTAMP. Before this fix it stored DATE (day precision), which
+      // caused new Date('2026-01-02T06:00:00Z') - new Date('2026-01-02') > 0, triggering
+      // a spurious updateDatabase on every sync after the initial addDatabase push.
+      const value      = { uid: 'p', label: 'precision' }
+      const dbMeta     = { uid: 'p', created_at: '2026-01-02T06:00:00.000Z' }            // TIMESTAMP from server
+      const clientMeta = { uid: 'p', created_at: new Date('2026-01-02T06:00:00.000Z') }  // full timestamp on client
+      const result = computeSyncResult({ p: value }, { p: clientMeta }, { p: dbMeta })
+      assert.deepEqual(result.updateDatabase, [], 'identical timestamps must not trigger spurious updateDatabase')
+      assert.deepEqual(result.updateClient,   [])
+   })
+
    test('record in both, same timestamp → no action', () => {
       const value      = { uid: 'f', label: 'same' }
       const dbMeta     = { uid: 'f', created_at: T0, updated_at: T1 }
