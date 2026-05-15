@@ -479,6 +479,49 @@ describe('Full client ↔ server protocol', () => {
       await new Promise(resolve => serverApp2.httpServer.close(resolve))
    })
 
+   test('createWithMeta is idempotent: duplicate call does not erase the Dexie record', async () => {
+      // Race condition: create() fires createWithMeta_A and returns immediately.
+      // A concurrent synchronize() snapshots findMany() before _A lands on the server,
+      // so the record appears in addDatabase.  The sync fires createWithMeta_B.
+      // The server processes _A first (success), then _B hits a PK conflict on the
+      // model table → throws → addDatabase catch deletes the record from Dexie.
+      // Fix: model INSERT should use ON CONFLICT DO UPDATE just like the metadata INSERT.
+      const modelName = `model${++dbCounter}`
+      const { db, metaTable, modelTable } = await createTestDb(modelName)
+
+      // Server already has r1 (createWithMeta_A already landed)
+      await db.insert(modelTable).values({ uid: 'r1', label: 'original' })
+      await db.insert(metaTable).values({ uid: 'r1', created_at: T0 })
+
+      const { clientApp, cleanup } = await createTestContext(
+         serverApp => serverApp.configure(drizzleOfflinePlugin, db, metaTable, [modelTable]),
+         { useOfflinePlugin: true },
+      )
+
+      try {
+         const model = clientApp.createOfflineModel(modelName, ['label'])
+         // Client has r1 in Dexie from the optimistic create
+         await model.db.values.add({ uid: 'r1', label: 'original' })
+         await model.db.metadata.add({ uid: 'r1', created_at: T0 })
+
+         // Simulate createWithMeta_B: same call the addDatabase step would make
+         let threw = false
+         try {
+            await clientApp.service(modelName).createWithMeta('r1', { label: 'original' }, T0)
+         } catch (err) {
+            threw = true
+         }
+
+         assert.ok(!threw, 'createWithMeta should not throw when uid already exists on server')
+
+         // The rollback must NOT have run — r1 must still be in Dexie
+         const r1 = await model.db.values.get('r1')
+         assert.ok(r1, 'client Dexie should retain r1 after idempotent createWithMeta')
+      } finally {
+         await cleanup()
+      }
+   })
+
    test('addClient succeeds even when orphaned metadata already exists in Dexie', async () => {
       // The deleteWithMeta pub/sub handler does db.metadata.put(meta) which leaves
       // an orphaned metadata row after the value is deleted. If the same record is
