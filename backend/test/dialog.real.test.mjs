@@ -223,4 +223,76 @@ describe('Full client ↔ server protocol', () => {
       }
    })
 
+   test('offline changes are synced after server restart', async () => {
+      const modelName = `model${++dbCounter}`
+      const { db, metaTable, modelTable } = await createTestDb(modelName)
+
+      // ─ Phase 1: start server, connect, register synchro scope ─
+      const serverApp1 = expressX({})
+      serverApp1.configure(drizzleOfflinePlugin, db, metaTable, [modelTable])
+      await new Promise(resolve => serverApp1.httpServer.listen(0, resolve))
+      const port = serverApp1.httpServer.address().port
+
+      const socket = ioc(`http://localhost:${port}`, {
+         transports: ['websocket'],
+         autoConnect: false,
+         reconnectionDelay: 100,
+         reconnectionDelayMax: 500,
+      })
+      const clientApp = createClient(socket, { debug: false })
+      offlinePlugin(clientApp)
+      socket.connect()
+      await new Promise((resolve, reject) => {
+         socket.on('connect', resolve)
+         socket.on('connect_error', reject)
+      })
+
+      const model = clientApp.createOfflineModel(modelName, ['label'])
+      await model.addSynchroWhere({})
+      await model.synchronizeAll() // initial sync — server is empty
+
+      // ─ Phase 2: stop server; disconnect all clients ─
+      // io.disconnectSockets() gives 'io server disconnect' which suppresses
+      // socket.io auto-reconnect, so we reconnect manually in phase 5.
+      const disconnected = new Promise(resolve => socket.once('disconnect', resolve))
+      serverApp1.io.disconnectSockets(true)
+      serverApp1.httpServer.closeAllConnections()
+      await new Promise(resolve => serverApp1.httpServer.close(resolve))
+      await disconnected
+
+      assert.equal(clientApp.isConnected, false, 'client should be offline')
+
+      // ─ Phase 3: write to Dexie while offline ─
+      await model.db.values.add({ uid: 'y1', label: 'Offline change' })
+      await model.db.metadata.add({ uid: 'y1', created_at: T1 })
+
+      // ─ Phase 4: restart server on the same port ─
+      const serverApp2 = expressX({})
+      serverApp2.configure(drizzleOfflinePlugin, db, metaTable, [modelTable])
+      await new Promise(resolve => serverApp2.httpServer.listen(port, resolve))
+
+      // ─ Phase 5: reconnect manually (auto-reconnect is suppressed after
+      // server-initiated disconnect) and wait for offlinePlugin to fire ─
+      const reconnected = new Promise((resolve, reject) => {
+         const timer = setTimeout(() => reject(new Error('reconnect timeout')), 5000)
+         socket.once('connect', () => { clearTimeout(timer); resolve() })
+      })
+      socket.connect()
+      await reconnected
+
+      // ─ Phase 6: offlinePlugin's connect listener fires synchronizeAll in the
+      // background; awaiting it here serialises behind the mutex so assertions
+      // run only after the offline change has been pushed to the server. ─
+      await model.synchronizeAll()
+
+      // ─ Phase 7: assert ─
+      assert.equal(clientApp.isConnected, true, 'client should be online again')
+      const rows = await db.select().from(modelTable).where(eq(modelTable.uid, 'y1'))
+      assert.ok(rows.length > 0, 'offline change should reach the server after reconnect')
+      assert.equal(rows[0].label, 'Offline change')
+
+      socket.disconnect()
+      await new Promise(resolve => serverApp2.httpServer.close(resolve))
+   })
+
 })
