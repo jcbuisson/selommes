@@ -430,15 +430,13 @@ export function offlinePlugin(app) {
             await idbValues.delete(uid)
             await idbMetadata.update(uid, { deleted_at })
          }
-         // 3- update elements of cache
-         for (const elt of updateClient) {
-            // get full value of element to update
-            const value = await app.service(modelName).findUnique({ where:{ uid: elt.uid }})
+         // 3- update elements of cache with server's newer version
+         for (const [elt, serverMeta] of updateClient) {
+            const value = { ...elt }
             delete value.uid
             delete value.__deleted__
             await idbValues.update(elt.uid, value)
-            const metadata = await idbMetadata.get(elt.uid)
-            await idbMetadata.update(elt.uid, { updated_at: metadata.updated_at })
+            await idbMetadata.update(elt.uid, { updated_at: serverMeta.updated_at })
          }
 
          // 4- create elements of `addDatabase` with full data from cache

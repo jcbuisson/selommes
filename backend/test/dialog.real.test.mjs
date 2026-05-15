@@ -195,6 +195,40 @@ describe('Full client ↔ server protocol', () => {
       }
    })
 
+   test('record in both, DB newer → client cache is updated with server value', async () => {
+      const modelName = `model${++dbCounter}`
+      const { db, metaTable, modelTable } = await createTestDb(modelName)
+
+      // Server has s1 at T2 (newer than client)
+      await db.insert(modelTable).values({ uid: 's1', label: 'server-v2' })
+      await db.insert(metaTable).values({ uid: 's1', created_at: '2026-01-01', updated_at: '2026-01-03' })
+
+      const { clientApp, cleanup } = await createTestContext(
+         serverApp => serverApp.configure(drizzleOfflinePlugin, db, metaTable, [modelTable]),
+         { useOfflinePlugin: true },
+      )
+
+      try {
+         const model = clientApp.createOfflineModel(modelName, ['label'])
+         // Client has s1 at T1 (stale)
+         await model.db.values.add({ uid: 's1', label: 'client-v1' })
+         await model.db.metadata.add({ uid: 's1', created_at: T0, updated_at: T1 })
+         await model.addSynchroWhere({})
+         await model.synchronizeAll()
+
+         const s1 = await model.db.values.get('s1')
+         assert.equal(s1.label, 'server-v2', 'client Dexie should be updated with server\'s newer value')
+
+         // A second sync must be a no-op — proves the client timestamp was
+         // correctly updated to the server's, avoiding an infinite re-sync loop.
+         await model.synchronizeAll()
+         const s1Again = await model.db.values.get('s1')
+         assert.equal(s1Again.label, 'server-v2', 'second sync should not overwrite client value')
+      } finally {
+         await cleanup()
+      }
+   })
+
    test('record in both, client newer → server is updated via socket', async () => {
       const modelName = `model${++dbCounter}`
       const { db, metaTable, modelTable } = await createTestDb(modelName)

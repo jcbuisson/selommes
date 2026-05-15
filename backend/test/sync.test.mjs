@@ -65,7 +65,7 @@ describe('computeSyncResult', () => {
       const dbMeta     = { uid: 'e', created_at: T0, updated_at: T2 }
       const clientMeta = { uid: 'e', created_at: T0, updated_at: T1 }
       const result = computeSyncResult({ e: value }, { e: clientMeta }, { e: dbMeta })
-      assert.deepEqual(result.updateClient, [value])
+      assert.deepEqual(result.updateClient, [[value, dbMeta]])
       assert.deepEqual(result.updateDatabase, [])
    })
 

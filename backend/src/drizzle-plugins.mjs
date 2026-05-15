@@ -67,7 +67,7 @@ export function computeSyncResult(databaseValuesDict, clientMetadataDict, databa
          const databaseUpdatedAt = new Date(databaseMetaData.updated_at || databaseMetaData.created_at)
          const diff = clientUpdatedAt - databaseUpdatedAt
          if (diff > 0) updateDatabase.push(clientMetaData)
-         else if (diff < 0) updateClient.push(databaseValuesDict[uid])
+         else if (diff < 0) updateClient.push([databaseValuesDict[uid], databaseMetaData])
       }
    }
 
