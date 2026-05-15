@@ -3,8 +3,8 @@ import express from 'express'
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { eq } from 'drizzle-orm';
 
-import { expressX, reloadPlugin } from '@jcbuisson/express-x'
-// import { expressX, reloadPlugin } from '#root/src/server.mjs'
+// import { expressX, reloadPlugin } from '@jcbuisson/express-x'
+import { expressX, reloadPlugin } from '#root/src/server.mjs'
 // import { drizzleOfflinePlugin } from '@jcbuisson/express-x-drizzle'
 import { drizzleOfflinePlugin } from '#root/src/drizzle-plugins.mjs'
 

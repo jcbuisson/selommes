@@ -48,6 +48,7 @@
     "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.31.10",
     "fake-indexeddb": "^6.2.5",
+    "socket.io-client": "^4.8.3",
     "tsx": "^4.21.0"
   }
 }
