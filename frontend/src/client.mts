@@ -426,9 +426,9 @@ export function offlinePlugin(app) {
             })
          }
          // 2- delete elements from indexedDB cache
-         for (const [uid, deleted_at] of deleteClient) {
+         for (const [uid] of deleteClient) {
             await idbValues.delete(uid)
-            await idbMetadata.update(uid, { deleted_at })
+            await idbMetadata.delete(uid)
          }
          // 3- update elements of cache with server's newer version
          for (const [elt, serverMeta] of updateClient) {

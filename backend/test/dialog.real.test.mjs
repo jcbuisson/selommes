@@ -10,7 +10,9 @@ import { pgTable, text, date } from 'drizzle-orm/pg-core'
 import { eq } from 'drizzle-orm'
 
 import { createClient, offlinePlugin } from '../../frontend/src/client.mts'
+// import { expressX } from '@jcbuisson/express-x'
 import { expressX } from '#root/src/server.mjs'
+// import { drizzleOfflinePlugin } from '@jcbuisson/express-x-drizzle'
 import { drizzleOfflinePlugin } from '#root/src/drizzle-plugins.mjs'
 
 const T0 = new Date('2026-01-01T00:00:00Z')
@@ -190,6 +192,35 @@ describe('Full client ↔ server protocol', () => {
          assert.ok(!rows.find(r => r.uid === 'd1'), 'server should not have the deleted-only record')
          const d1 = await model.db.values.get('d1')
          assert.ok(!d1, 'Dexie should no longer hold the deleted record')
+      } finally {
+         await cleanup()
+      }
+   })
+
+   test('deleted record is fully removed from Dexie metadata after sync', async () => {
+      const modelName = `model${++dbCounter}`
+      const { db, metaTable, modelTable } = await createTestDb(modelName)
+
+      const { clientApp, cleanup } = await createTestContext(
+         serverApp => serverApp.configure(drizzleOfflinePlugin, db, metaTable, [modelTable]),
+         { useOfflinePlugin: true },
+      )
+
+      try {
+         const model = clientApp.createOfflineModel(modelName, ['label'])
+         // Record created and deleted locally before ever reaching the server
+         await model.db.values.add({ uid: 'd1', label: 'Gone', __deleted__: true })
+         await model.db.metadata.add({ uid: 'd1', created_at: T0, deleted_at: T1 })
+         await model.addSynchroWhere({})
+         await model.synchronizeAll()
+
+         const d1 = await model.db.values.get('d1')
+         assert.ok(!d1, 'Dexie values should not hold deleted record')
+
+         // Metadata must also be removed — orphaned rows waste space and cause
+         // a ConstraintError if a record with the same uid is ever re-created
+         const d1Meta = await model.db.metadata.get('d1')
+         assert.ok(!d1Meta, 'Dexie metadata should also be removed for deleted record')
       } finally {
          await cleanup()
       }
