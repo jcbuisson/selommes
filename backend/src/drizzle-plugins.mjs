@@ -3,7 +3,7 @@ import { createServer } from "http"
 import { Server } from "socket.io"
 import bcrypt from 'bcryptjs'
 
-import { and, eq, getTableName } from "drizzle-orm";
+import { and, eq, gt, gte, lt, lte, isNull, getTableName } from "drizzle-orm";
 
 import { metadata } from '#root/src/db/schema.js';
 import { Mutex, truncateString } from '@jcbuisson/express-x'
@@ -14,7 +14,16 @@ import { Mutex, truncateString } from '@jcbuisson/express-x'
 function whereToDrizzleFilters(table, where) {
    const conditions = Object.entries(where)
       .filter(([_, value]) => value !== undefined)
-      .map(([key, value]) => eq(table[key], value));
+      .map(([key, value]) => {
+         if (value === null)           return isNull(table[key])
+         if (typeof value === 'object') {
+            if ('gte' in value)        return gte(table[key], value.gte)
+            if ('gt'  in value)        return gt(table[key],  value.gt)
+            if ('lte' in value)        return lte(table[key], value.lte)
+            if ('lt'  in value)        return lt(table[key],  value.lt)
+         }
+         return eq(table[key], value)
+      })
    return conditions.length ? and(...conditions) : undefined;
 }
 

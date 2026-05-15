@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 import { io as ioc } from 'socket.io-client'
 import { PGlite } from '@electric-sql/pglite'
 import { drizzle } from 'drizzle-orm/pglite'
-import { pgTable, text, timestamp } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, integer } from 'drizzle-orm/pg-core'
 import { eq } from 'drizzle-orm'
 
 import { createClient, offlinePlugin } from '../../frontend/src/client.mts'
@@ -477,6 +477,57 @@ describe('Full client ↔ server protocol', () => {
 
       socket.disconnect()
       await new Promise(resolve => serverApp2.httpServer.close(resolve))
+   })
+
+   test('whereToDrizzleFilters supports range operators used in addSynchroWhere', async () => {
+      // wherePredicate (client) handles { score: { gte: 5 } } correctly after earlier fixes,
+      // but whereToDrizzleFilters (server) only calls eq() for every value.
+      // Passing an object like { gte: 5 } to eq() makes Drizzle try to bind a plain
+      // object as a PostgreSQL parameter → query throws → sync.go catch swallows the error
+      // and returns undefined → client gets a TypeError → sync silently fails.
+      const modelName = `model${++dbCounter}`
+      const pglite = new PGlite()
+      await pglite.exec(`
+         CREATE TABLE metadata (uid TEXT PRIMARY KEY, created_at TIMESTAMP, updated_at TIMESTAMP, deleted_at TIMESTAMP);
+         CREATE TABLE "${modelName}" (uid TEXT PRIMARY KEY, label TEXT NOT NULL, score INTEGER NOT NULL);
+      `)
+      const db = drizzle(pglite)
+      const metaTable = pgTable('metadata', {
+         uid: text('uid').primaryKey(),
+         created_at: timestamp(), updated_at: timestamp(), deleted_at: timestamp(),
+      })
+      const modelTable = pgTable(modelName, {
+         uid: text('uid').primaryKey(),
+         label: text('label').notNull(),
+         score: integer('score').notNull(),
+      })
+
+      await db.insert(modelTable).values([
+         { uid: 'lo', label: 'low',  score: 3 },
+         { uid: 'hi', label: 'high', score: 7 },
+      ])
+      await db.insert(metaTable).values([
+         { uid: 'lo', created_at: T0 },
+         { uid: 'hi', created_at: T0 },
+      ])
+
+      const { clientApp, cleanup } = await createTestContext(
+         serverApp => serverApp.configure(drizzleOfflinePlugin, db, metaTable, [modelTable]),
+         { useOfflinePlugin: true },
+      )
+
+      try {
+         const model = clientApp.createOfflineModel(modelName, ['label'])
+         await model.addSynchroWhere({ score: { gte: 5 } })
+         await model.synchronizeAll()
+
+         const vals = await model.db.values.toArray()
+         const uids = vals.map(v => v.uid)
+         assert.ok(!uids.includes('lo'), 'score=3 should NOT be pulled (< 5)')
+         assert.ok( uids.includes('hi'), 'score=7 should be pulled (≥ 5)')
+      } finally {
+         await cleanup()
+      }
    })
 
    test('update() rollback clears stale updated_at from metadata', async () => {
