@@ -123,7 +123,16 @@ export function drizzleOfflinePlugin(app, db, metadata, models) {
          createWithMeta: async (uid, data, created_at) => {
             return await db.transaction(async (tx) => {
                const value = await tx.insert(model).values({ uid, ...data }).returning();
-               const meta = await tx.insert(metadata).values({ uid, created_at }).returning();
+               // Upsert: if a metadata row already exists (left over from a previous
+               // deleteWithMeta which hard-deletes the model row but keeps metadata),
+               // clear deleted_at/updated_at so the record is active again.
+               const meta = await tx.insert(metadata)
+                  .values({ uid, created_at })
+                  .onConflictDoUpdate({
+                     target: metadata.uid,
+                     set: { created_at, deleted_at: null, updated_at: null },
+                  })
+                  .returning();
                return [value, meta]
             })
          },

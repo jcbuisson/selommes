@@ -257,6 +257,44 @@ describe('Full client ↔ server protocol', () => {
       }
    })
 
+   test('record deleted on server while client was offline is re-created on reconnect', async () => {
+      const modelName = `model${++dbCounter}`
+      const { db, metaTable, modelTable } = await createTestDb(modelName)
+
+      // r1 exists on server initially
+      await db.insert(modelTable).values({ uid: 'r1', label: 'original' })
+      await db.insert(metaTable).values({ uid: 'r1', created_at: '2026-01-01' })
+
+      // Server-side delete while client was offline: hard-delete from model table,
+      // but metadata row stays with deleted_at set (this is what deleteWithMeta does)
+      await db.delete(modelTable).where(eq(modelTable.uid, 'r1'))
+      await db.update(metaTable).set({ deleted_at: '2026-01-02' }).where(eq(metaTable.uid, 'r1'))
+
+      const { clientApp, cleanup } = await createTestContext(
+         serverApp => serverApp.configure(drizzleOfflinePlugin, db, metaTable, [modelTable]),
+         { useOfflinePlugin: true },
+      )
+
+      try {
+         const model = clientApp.createOfflineModel(modelName, ['label'])
+         // Client has r1 — it was offline when the server deleted it
+         await model.db.values.add({ uid: 'r1', label: 'keep me' })
+         await model.db.metadata.add({ uid: 'r1', created_at: T0 })
+         await model.addSynchroWhere({})
+         await model.synchronizeAll()
+
+         // Client's copy should have been pushed back to the server
+         const rows = await db.select().from(modelTable)
+         assert.ok(rows.find(r => r.uid === 'r1'), 'server should have r1 after client pushes it back')
+         assert.equal(rows.find(r => r.uid === 'r1').label, 'keep me')
+         // And client's Dexie should still have it
+         const r1 = await model.db.values.get('r1')
+         assert.ok(r1, 'client Dexie should still have r1 after sync')
+      } finally {
+         await cleanup()
+      }
+   })
+
    test('offline changes are synced after server restart', async () => {
       const modelName = `model${++dbCounter}`
       const { db, metaTable, modelTable } = await createTestDb(modelName)
