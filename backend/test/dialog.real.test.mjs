@@ -479,6 +479,53 @@ describe('Full client ↔ server protocol', () => {
       await new Promise(resolve => serverApp2.httpServer.close(resolve))
    })
 
+   test('update() rollback clears stale updated_at from metadata', async () => {
+      // Optimistic update sets updated_at = now in metadata before the server responds.
+      // On rejection the rollback does db.metadata.update(uid, previousMetadata), but
+      // previousMetadata captured before the update has no updated_at key, so Dexie's
+      // partial update leaves updated_at = now in place.
+      // On the next sync: new Date(stale_now) - new Date(T0) > 0 → spurious updateDatabase.
+      const modelName = `model${++dbCounter}`
+
+      const { clientApp, cleanup } = await createTestContext(serverApp => {
+         serverApp.createService(modelName, {
+            updateWithMeta: async () => { throw new Error('server rejected update') },
+            createWithMeta: async () => {},
+            deleteWithMeta: async () => {},
+            findMany:        async () => [],
+            findUnique:      async () => null,
+         })
+         serverApp.createService('sync', {
+            go: async () => ({ addClient: [], updateClient: [], deleteClient: [], addDatabase: [], updateDatabase: [] }),
+         })
+      }, { useOfflinePlugin: true })
+
+      try {
+         const model = clientApp.createOfflineModel(modelName, ['label'])
+         await model.db.values.add({ uid: 'r1', label: 'original' })
+         await model.db.metadata.add({ uid: 'r1', created_at: T0 })  // no updated_at
+
+         // update() optimistically sets updated_at = now, then server rejects
+         await model.update('r1', { label: 'new' })
+
+         // Poll until the rollback restores the value
+         for (let i = 0; i < 50; i++) {
+            await new Promise(r => setTimeout(r, 10))
+            const v = await model.db.values.get('r1')
+            if (v?.label === 'original') break
+         }
+
+         assert.equal((await model.db.values.get('r1'))?.label, 'original', 'value should be rolled back')
+
+         // updated_at must be null/undefined after rollback — a stale timestamp would
+         // cause every subsequent sync to fire a spurious updateDatabase
+         const meta = await model.db.metadata.get('r1')
+         assert.ok(!meta.updated_at, 'updated_at should be null after rollback, not a stale timestamp')
+      } finally {
+         await cleanup()
+      }
+   })
+
    test('createWithMeta is idempotent: duplicate call does not erase the Dexie record', async () => {
       // Race condition: create() fires createWithMeta_A and returns immediately.
       // A concurrent synchronize() snapshots findMany() before _A lands on the server,

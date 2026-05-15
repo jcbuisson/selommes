@@ -279,7 +279,10 @@ export function offlinePlugin(app) {
                delete previousValue.uid
                await db.values.update(uid, previousValue)
                delete previousMetadata.uid
-               await db.metadata.update(uid, previousMetadata)
+               // Dexie's update() ignores keys with value `undefined`, so if updated_at
+               // was absent before the optimistic write it won't be cleared by a plain
+               // spread.  Use ?? null to explicitly restore it to null in that case.
+               await db.metadata.update(uid, { ...previousMetadata, updated_at: previousMetadata.updated_at ?? null })
             })
          }
          return await db.values.get(uid)
