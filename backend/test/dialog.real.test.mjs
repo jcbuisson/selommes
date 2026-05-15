@@ -479,4 +479,54 @@ describe('Full client ↔ server protocol', () => {
       await new Promise(resolve => serverApp2.httpServer.close(resolve))
    })
 
+   test('pub/sub createWithMeta event correctly updates a second client\'s Dexie', async () => {
+      const modelName = `model${++dbCounter}`
+      const { db, metaTable, modelTable } = await createTestDb(modelName)
+
+      // Server with pub/sub: every client joins 'all' and createWithMeta broadcasts there
+      const serverApp = expressX({})
+      serverApp.configure(drizzleOfflinePlugin, db, metaTable, [modelTable])
+      serverApp.addConnectListener(socket => serverApp.joinChannel('all', socket))
+      serverApp.service(modelName).publish(async () => ['all'])
+      await new Promise(resolve => serverApp.httpServer.listen(0, resolve))
+      const port = serverApp.httpServer.address().port
+
+      function connectClient() {
+         const socket = ioc(`http://localhost:${port}`, { transports: ['websocket'], autoConnect: false })
+         const app = createClient(socket, { debug: false })
+         offlinePlugin(app)
+         socket.connect()
+         return new Promise((resolve, reject) => {
+            socket.on('connect', () => resolve({ app, socket }))
+            socket.on('connect_error', reject)
+         })
+      }
+
+      const { app: appA, socket: socketA } = await connectClient()
+      const { app: appB, socket: socketB } = await connectClient()
+
+      const modelA = appA.createOfflineModel(modelName, ['label'])
+      const modelB = appB.createOfflineModel(modelName, ['label'])
+
+      try {
+         // Client A creates a record while connected — fires createWithMeta directly
+         const record = await modelA.create({ label: 'from-A' })
+
+         // Poll until the pub/sub event reaches client B's Dexie
+         let inB = null
+         for (let i = 0; i < 50; i++) {
+            await new Promise(r => setTimeout(r, 10))
+            inB = await modelB.db.values.get(record.uid)
+            if (inB) break
+         }
+
+         assert.ok(inB, 'Client B should receive the record via pub/sub')
+         assert.equal(inB.label, 'from-A', 'Client B should have the correct label')
+      } finally {
+         socketA.disconnect()
+         socketB.disconnect()
+         await new Promise(resolve => serverApp.httpServer.close(resolve))
+      }
+   })
+
 })
