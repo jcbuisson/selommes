@@ -417,12 +417,15 @@ export function offlinePlugin(app) {
          console.log('-> service.sync', modelName, where, addClient, updateClient, deleteClient, addDatabase, updateDatabase)
 
          // 1- add missing elements in indexedDB cache
-         // Use a single transaction for all adds to ensure atomicity
+         // Use a single transaction for all adds to ensure atomicity.
+         // put() instead of add() for metadata: a deleteWithMeta pub/sub event leaves
+         // an orphaned metadata row (value deleted, metadata kept with deleted_at).
+         // add() would throw a ConstraintError on that orphan; put() upserts safely.
          if (addClient.length > 0) {
             await idbValues.db.transaction('rw', [idbValues, idbMetadata], async () => {
                for (const [value, metaData] of addClient) {
                   await idbValues.add(value)
-                  await idbMetadata.add(metaData)
+                  await idbMetadata.put(metaData)
                }
             })
          }

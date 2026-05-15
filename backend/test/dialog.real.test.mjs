@@ -479,6 +479,41 @@ describe('Full client ↔ server protocol', () => {
       await new Promise(resolve => serverApp2.httpServer.close(resolve))
    })
 
+   test('addClient succeeds even when orphaned metadata already exists in Dexie', async () => {
+      // The deleteWithMeta pub/sub handler does db.metadata.put(meta) which leaves
+      // an orphaned metadata row after the value is deleted. If the same record is
+      // later re-created on the server, addClient tries idbMetadata.add() which
+      // throws a ConstraintError (PK already taken by the orphan), aborting the
+      // entire addClient transaction — the record never arrives in the client cache.
+      const modelName = `model${++dbCounter}`
+      const { db, metaTable, modelTable } = await createTestDb(modelName)
+
+      await db.insert(modelTable).values({ uid: 'r1', label: 'from-server' })
+      await db.insert(metaTable).values({ uid: 'r1', created_at: T0 })
+
+      const { clientApp, cleanup } = await createTestContext(
+         serverApp => serverApp.configure(drizzleOfflinePlugin, db, metaTable, [modelTable]),
+         { useOfflinePlugin: true },
+      )
+
+      try {
+         const model = clientApp.createOfflineModel(modelName, ['label'])
+
+         // Simulate the orphaned metadata left by a deleteWithMeta pub/sub event:
+         // the value row is gone but the metadata row remains with deleted_at set.
+         await model.db.metadata.add({ uid: 'r1', created_at: T0, deleted_at: T1 })
+
+         await model.addSynchroWhere({})
+         await model.synchronizeAll()
+
+         const r1 = await model.db.values.get('r1')
+         assert.ok(r1, 'r1 should be pulled into Dexie via addClient despite orphaned metadata')
+         assert.equal(r1.label, 'from-server')
+      } finally {
+         await cleanup()
+      }
+   })
+
    test('wherePredicate handles falsy boundary value (lte: 0) correctly', async () => {
       // wherePredicate is used by synchronize() to build clientMetadataDict.
       // A falsy boundary (lte: 0) is checked with `if (value.lte)` which treats 0
