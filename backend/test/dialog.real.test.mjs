@@ -479,6 +479,39 @@ describe('Full client ↔ server protocol', () => {
       await new Promise(resolve => serverApp2.httpServer.close(resolve))
    })
 
+   test('wherePredicate range check excludes records whose field is absent (undefined)', async () => {
+      // Comparing undefined with a number via >, <, >=, <= always returns false in JS
+      // (undefined coerces to NaN, and NaN comparisons are always false).  So none of
+      // the range return-false guards fire and a record WITHOUT the filtered field
+      // incorrectly passes { score: { gte: 1 } }.  In PostgreSQL, NULL values are
+      // correctly excluded by range operators, creating a client/server mismatch:
+      // the client includes the record in clientMetadataDict → addDatabase → if the
+      // column is NOT NULL the insert fails → rollback deletes the record from Dexie.
+      const modelName = `model${++dbCounter}`
+      const { db, metaTable, modelTable } = await createTestDb(modelName)
+
+      const { clientApp, cleanup } = await createTestContext(
+         serverApp => serverApp.configure(drizzleOfflinePlugin, db, metaTable, [modelTable]),
+         { useOfflinePlugin: true },
+      )
+
+      try {
+         const model = clientApp.createOfflineModel(modelName, ['label'])
+
+         // r1 has no 'score' field; r2 has score=5
+         await model.db.values.add({ uid: 'r1', label: 'no-score' })
+         await model.db.values.add({ uid: 'r2', label: 'has-score', score: 5 })
+
+         const results = await model.findWhere({ score: { gte: 1 } })
+         const uids = results.map(r => r.uid)
+
+         assert.ok(!uids.includes('r1'), 'record without score field must NOT match { gte: 1 }')
+         assert.ok( uids.includes('r2'), 'record with score=5 must match { gte: 1 }')
+      } finally {
+         await cleanup()
+      }
+   })
+
    test('addSynchroWhere with range-operator where does not log ConstraintError when already covered', async () => {
       // isSubset uses !== (reference equality) for all values.  For primitive where
       // values (strings, numbers) this is fine.  For object values like { gte: 1 },
