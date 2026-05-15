@@ -479,6 +479,37 @@ describe('Full client ↔ server protocol', () => {
       await new Promise(resolve => serverApp2.httpServer.close(resolve))
    })
 
+   test('app-event for unregistered type is silently ignored, not TypeError', async () => {
+      // When an app-event arrives for a type with no registered handler,
+      // type2appHandler[type] is undefined.  The guard
+      //   if (!type2appHandler[type]) type2appHandler[type] = {}
+      // sets it to an empty object {}.  {} is truthy, so the next line
+      //   if (handler) handler(value)
+      // tries to call {} as a function → TypeError: {} is not a function.
+      const received = []
+
+      const { clientApp, cleanup } = await createTestContext(serverApp => {
+         serverApp.addConnectListener(socket => {
+            // Delay so the test code below can register handlers before the events fire
+            setTimeout(() => {
+               // First: an event for a type WITH no registered handler (triggers the bug)
+               serverApp.sendAppEvent(socket.id, 'unregistered-type', 'ignored')
+               // Second: an event for a type WITH a registered handler (must still work)
+               serverApp.sendAppEvent(socket.id, 'registered-type', 'hello')
+            }, 100)
+         })
+      })
+
+      try {
+         clientApp.on('registered-type', val => received.push(val))
+         await new Promise(r => setTimeout(r, 400))
+         assert.deepEqual(received, ['hello'],
+            'registered handler must be called even after an unregistered-type event')
+      } finally {
+         await cleanup()
+      }
+   })
+
    test('removeDisconnectListener is callable and removes the listener', async () => {
       // removeDisonnectListener (misspelled — missing 'c') was exported on the app object
       // instead of removeDisconnectListener.  app.removeDisconnectListener is therefore

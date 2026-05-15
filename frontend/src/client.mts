@@ -143,9 +143,8 @@ export function createClient(socket, options={}) {
    // without front-end interactions
    socket.on('app-event', ({ type, value }) => {
       if (options.debug) console.log('app-event', type, value)
-      if (!type2appHandler[type]) type2appHandler[type] = {}
       const handler = type2appHandler[type]
-      if (handler) handler(value)
+      if (typeof handler === 'function') handler(value)
    })
 
    // add a handler for application-wide events
