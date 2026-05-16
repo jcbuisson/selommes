@@ -54,7 +54,7 @@ export function computeSyncResult(databaseValuesDict, clientMetadataDict, databa
    const addClient = [], updateClient = [], deleteClient = []
 
    for (const uid of onlyDatabaseIds) {
-      const databaseMetaData = databaseMetadataDict[uid] || { uid, created_at: new Date() }
+      const databaseMetaData = databaseMetadataDict[uid] || { uid, created_at: null }
       addClient.push([databaseValuesDict[uid], databaseMetaData])
    }
 
@@ -73,7 +73,7 @@ export function computeSyncResult(databaseValuesDict, clientMetadataDict, databa
          deleteDatabase.push(uid)
          deleteClient.push([uid, clientMetaData.deleted_at])
       } else {
-         const databaseMetaData = databaseMetadataDict[uid] || { uid, created_at: new Date() }
+         const databaseMetaData = databaseMetadataDict[uid] || { uid, created_at: null }
          const clientUpdatedAt = new Date(clientMetaData.updated_at || clientMetaData.created_at)
          const databaseUpdatedAt = new Date(databaseMetaData.updated_at || databaseMetaData.created_at)
          const diff = clientUpdatedAt - databaseUpdatedAt
@@ -135,9 +135,15 @@ export function drizzleOfflinePlugin(app, db, metadata, models) {
          },
 
          updateWithMeta: async (uid, data, updated_at) => {
+            const ts = updated_at ? new Date(updated_at) : null
             return await db.transaction(async (tx) => {
                const [value] = await tx.update(model).set(data).where(eq(model.uid, uid)).returning();
-               const [meta] = await tx.update(metadata).set({ updated_at: new Date(updated_at) }).where(eq(metadata.uid, uid)).returning();
+               // Upsert metadata: if the row is missing (data-integrity gap where the
+               // model row exists but no metadata row), create it so the loop stops.
+               const [meta] = await tx.insert(metadata)
+                  .values({ uid, updated_at: ts })
+                  .onConflictDoUpdate({ target: metadata.uid, set: { updated_at: ts } })
+                  .returning();
                return [value, meta]
             })
          },
