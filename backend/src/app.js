@@ -28,7 +28,7 @@ app.configure(drizzleOfflinePlugin, db, metadata, [ user, range ])
 app.configure(reloadPlugin)
 
 // publish
-// app.configure(publish)
+app.configure(publish)
 // subscribe
 app.on('connection', (socket) => {
    app.joinChannel('anonymous', socket)
