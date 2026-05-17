@@ -479,6 +479,59 @@ describe('Full client ↔ server protocol', () => {
       await new Promise(resolve => serverApp2.httpServer.close(resolve))
    })
 
+   test('deleteWithMeta pub/sub handler uses delete not put to avoid orphan metadata', async () => {
+      // synchronize() step 2 deletes both idbValues and idbMetadata for deleteClient uids.
+      // The deleteWithMeta pub/sub event may arrive on the SAME tab either before or after
+      // that cleanup.  The handler uses db.metadata.put(meta) (upsert with deleted_at),
+      // so if it runs AFTER step 2 it RE-CREATES the metadata row as an orphan that can
+      // never be cleaned up.  Fix: delete the metadata instead of putting it.
+      const modelName = `model${++dbCounter}`
+
+      const serverApp = expressX({})
+      serverApp.addConnectListener(socket => serverApp.joinChannel('all', socket))
+      await new Promise(resolve => serverApp.httpServer.listen(0, resolve))
+      const port = serverApp.httpServer.address().port
+
+      function connectClient() {
+         const socket = ioc(`http://localhost:${port}`, { transports: ['websocket'], autoConnect: false })
+         const app = createClient(socket, { debug: false })
+         offlinePlugin(app)
+         socket.connect()
+         return new Promise((resolve, reject) => {
+            socket.on('connect', () => resolve({ app, socket }))
+            socket.on('connect_error', reject)
+         })
+      }
+
+      const { app: appB, socket: socketB } = await connectClient()
+      const modelB = appB.createOfflineModel(modelName, ['label'])
+
+      // r1 exists in client B's Dexie
+      await modelB.db.values.add({ uid: 'r1', label: 'test' })
+      await modelB.db.metadata.add({ uid: 'r1', created_at: T0 })
+
+      // Simulate step 2 running first (synchronize already cleaned up r1)
+      await modelB.db.values.delete('r1')
+      await modelB.db.metadata.delete('r1')
+
+      // Pub/sub arrives AFTER step 2 — handler must not re-create metadata as an orphan
+      serverApp.io.to('all').emit('service-event', {
+         name: modelName,
+         action: 'deleteWithMeta',
+         result: [{ uid: 'r1', label: 'test' }, { uid: 'r1', created_at: T0, updated_at: null, deleted_at: T1 }],
+      })
+
+      await new Promise(r => setTimeout(r, 200))
+
+      // With bug:  put(meta) re-creates metadata with deleted_at → orphan persists
+      // With fix:  delete(uid) is a no-op → no orphan
+      const orphan = await modelB.db.metadata.get('r1')
+      assert.ok(!orphan, 'pub/sub handler must not leave an orphan metadata row after step-2 cleanup')
+
+      socketB.disconnect()
+      await new Promise(resolve => serverApp.httpServer.close(resolve))
+   })
+
    test('deleteWithMeta pub/sub handler tolerates undefined value (double-delete race)', async () => {
       // deleteWithMeta does `const [value] = DELETE ... RETURNING`.  When the record
       // is already gone (double-delete race now possible with pub/sub enabled) the
@@ -520,16 +573,12 @@ describe('Full client ↔ server protocol', () => {
 
       await new Promise(r => setTimeout(r, 200))
 
-      // With bug:  TypeError on undefined.uid aborts the handler before
-      //            db.metadata.put(meta) runs → deleted_at stays T0.
-      // With fix:  handler guards value, skips the delete, still puts the metadata
-      //            → deleted_at becomes T1.
+      // With original bug:  TypeError on undefined.uid aborts before db.metadata.*
+      //                     runs at all → r1 metadata stays unchanged.
+      // With delete fix:    handler guards value, then deletes the metadata row
+      //                     → r1 metadata is gone (no orphan, clean state).
       const meta = await modelB.db.metadata.get('r1')
-      assert.equal(
-         meta?.deleted_at?.toISOString?.() ?? String(meta?.deleted_at),
-         T1.toISOString(),
-         'metadata deleted_at must be updated even when value is undefined',
-      )
+      assert.ok(!meta, 'metadata must be removed even when value is undefined')
 
       socketB.disconnect()
       await new Promise(resolve => serverApp.httpServer.close(resolve))
