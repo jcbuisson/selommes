@@ -479,6 +479,51 @@ describe('Full client ↔ server protocol', () => {
       await new Promise(resolve => serverApp2.httpServer.close(resolve))
    })
 
+   test('update() rollback only restores updated_at, not deleted_at set by a concurrent remove()', async () => {
+      // The optimistic write in update() only touches updated_at.  The rollback on
+      // server rejection spreads the full previousMetadata snapshot — including
+      // deleted_at: null — overwriting any deleted_at that remove() set while the
+      // socket round-trip was in flight.  Only updated_at should be restored.
+      const modelName = `model${++dbCounter}`
+
+      const { clientApp, cleanup } = await createTestContext(serverApp => {
+         // updateWithMeta delays then rejects so remove() can run in the gap
+         serverApp.createService(modelName, {
+            updateWithMeta: async () => { await new Promise(r => setTimeout(r, 100)); throw new Error('rejected') },
+            deleteWithMeta: async () => {},
+            createWithMeta: async () => {},
+            findMany:        async () => [],
+         })
+         serverApp.createService('sync', {
+            go: async () => ({ addClient: [], updateClient: [], deleteClient: [], addDatabase: [], updateDatabase: [] }),
+         })
+      }, { useOfflinePlugin: true })
+
+      try {
+         const model = clientApp.createOfflineModel(modelName, ['label'])
+         await model.db.values.add({ uid: 'r1', label: 'original' })
+         // Explicitly store deleted_at: null (simulates what remove() rollback leaves
+         // behind).  Dexie stores the key so previousMetadata includes it, and the
+         // rollback then spreads it back — wiping any concurrent remove()'s value.
+         await model.db.metadata.add({ uid: 'r1', created_at: T0, deleted_at: null })
+
+         // Fire update() — server will delay 100 ms then reject
+         model.update('r1', { label: 'updated' })
+
+         // While updateWithMeta is in flight, remove() sets deleted_at
+         await model.remove('r1')
+
+         // Wait for the rejection and rollback to complete
+         await new Promise(r => setTimeout(r, 300))
+
+         // deleted_at must survive the update() rollback
+         const meta = await model.db.metadata.get('r1')
+         assert.ok(meta?.deleted_at, 'deleted_at set by remove() must not be cleared by update() rollback')
+      } finally {
+         await cleanup()
+      }
+   })
+
    test('addClient uses put (upsert) so a concurrent create does not cause ConstraintError', async () => {
       // create() adds a uid to Dexie between synchronize()'s idbValues.filter snapshot
       // and the addClient step.  Because the uid missed the snapshot it is absent from

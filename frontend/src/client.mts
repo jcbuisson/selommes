@@ -277,11 +277,11 @@ export function offlinePlugin(app) {
                // rollback
                delete previousValue.uid
                await db.values.update(uid, previousValue)
-               delete previousMetadata.uid
-               // Dexie's update() ignores keys with value `undefined`, so if updated_at
-               // was absent before the optimistic write it won't be cleared by a plain
-               // spread.  Use ?? null to explicitly restore it to null in that case.
-               await db.metadata.update(uid, { ...previousMetadata, updated_at: previousMetadata.updated_at ?? null })
+               // Only restore updated_at — the optimistic write only touched that field.
+               // Restoring the full previousMetadata snapshot would overwrite any
+               // deleted_at that remove() set while the socket round-trip was in flight,
+               // silently un-deleting the record.
+               await db.metadata.update(uid, { updated_at: previousMetadata.updated_at ?? null })
             })
          }
          return await db.values.get(uid)
