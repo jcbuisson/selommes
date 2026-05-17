@@ -229,7 +229,11 @@ export function offlinePlugin(app) {
 
       app.service(modelName).on('updateWithMeta', async ([value, meta]) => {
          console.log(`${modelName} EVENT updateWithMeta`, value);
-         await db.values.put(value);
+         // value may be undefined when the server's UPDATE RETURNING yielded 0 rows
+         // (concurrent delete race: record was removed between the sync's findMany
+         // snapshot and the actual UPDATE).  Guard to avoid a TypeError crash that
+         // would prevent db.metadata.put(meta) from running.
+         if (value?.uid) await db.values.put(value);
          await db.metadata.put(meta);
       });
 

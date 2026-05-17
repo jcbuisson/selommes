@@ -9,9 +9,7 @@ const router = useRouter()
 const email = ref('')
 
 async function onSubmit() {
-   console.log('login', email.value);
    const user = await app.service('user').findUnique({ email: email.value });
-   console.log('user', user);
    if (user) {
       localStorage.setItem('user_uid', user.uid);
       localStorage.setItem('color', user.color);

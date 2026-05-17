@@ -479,6 +479,57 @@ describe('Full client ↔ server protocol', () => {
       await new Promise(resolve => serverApp2.httpServer.close(resolve))
    })
 
+   test('updateWithMeta pub/sub handler tolerates undefined value (concurrent delete race)', async () => {
+      // updateWithMeta does `const [value] = UPDATE ... RETURNING`.  If the model row
+      // was deleted by a concurrent operation between the sync's findMany snapshot and
+      // the actual UPDATE, RETURNING yields 0 rows → value = undefined.  The server
+      // broadcasts [undefined, meta].  The handler crashes on `db.values.put(undefined)`
+      // (TypeError: Cannot read properties of undefined) before db.metadata.put(meta)
+      // can run, leaving metadata inconsistent.
+      const modelName = `model${++dbCounter}`
+
+      const serverApp = expressX({})
+      serverApp.addConnectListener(socket => serverApp.joinChannel('all', socket))
+      await new Promise(resolve => serverApp.httpServer.listen(0, resolve))
+      const port = serverApp.httpServer.address().port
+
+      function connectClient() {
+         const socket = ioc(`http://localhost:${port}`, { transports: ['websocket'], autoConnect: false })
+         const app = createClient(socket, { debug: false })
+         offlinePlugin(app)
+         socket.connect()
+         return new Promise((resolve, reject) => {
+            socket.on('connect', () => resolve({ app, socket }))
+            socket.on('connect_error', reject)
+         })
+      }
+
+      const { app: appB, socket: socketB } = await connectClient()
+      const modelB = appB.createOfflineModel(modelName, ['label'])
+
+      await modelB.db.values.add({ uid: 'r1', label: 'old' })
+      await modelB.db.metadata.add({ uid: 'r1', created_at: T0 })
+
+      // Simulate the server broadcasting updateWithMeta with undefined value
+      serverApp.io.to('all').emit('service-event', {
+         name: modelName,
+         action: 'updateWithMeta',
+         result: [undefined, { uid: 'r1', created_at: T0, updated_at: T1, deleted_at: null }],
+      })
+
+      await new Promise(r => setTimeout(r, 200))
+
+      // With bug:  TypeError on undefined crashes before db.metadata.put(meta) runs
+      //            → updated_at stays T0 (unchanged).
+      // With fix:  handler guards value, skips the put, still updates metadata
+      //            → updated_at becomes T1.
+      const meta = await modelB.db.metadata.get('r1')
+      assert.ok(meta?.updated_at, 'metadata updated_at must be set even when value is undefined')
+
+      socketB.disconnect()
+      await new Promise(resolve => serverApp.httpServer.close(resolve))
+   })
+
    test('deleteWithMeta pub/sub handler uses delete not put to avoid orphan metadata', async () => {
       // synchronize() step 2 deletes both idbValues and idbMetadata for deleteClient uids.
       // The deleteWithMeta pub/sub event may arrive on the SAME tab either before or after
