@@ -235,7 +235,11 @@ export function offlinePlugin(app) {
 
       app.service(modelName).on('deleteWithMeta', async ([value, meta]) => {
          console.log(`${modelName} EVENT deleteWithMeta`, value)
-         await db.values.delete(value.uid)
+         // value may be undefined when the server's DELETE RETURNING yielded 0 rows
+         // (double-delete race: record already gone when this call arrived).
+         // Guard before accessing .uid to avoid a TypeError that would abort the
+         // handler and prevent db.metadata.put(meta) from updating the cache.
+         if (value?.uid) await db.values.delete(value.uid)
          await db.metadata.put(meta)
       });
 

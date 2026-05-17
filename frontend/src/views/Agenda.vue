@@ -43,6 +43,7 @@ function cancelCreate() {
 
 async function onUpdate({ uid, start, end }) {
    await updateRange(uid, { start, end })
+   calendarRef.value?.clearSelection()
 }
 
 async function deleteSelectedRange() {

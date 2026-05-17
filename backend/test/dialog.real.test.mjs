@@ -479,6 +479,62 @@ describe('Full client ↔ server protocol', () => {
       await new Promise(resolve => serverApp2.httpServer.close(resolve))
    })
 
+   test('deleteWithMeta pub/sub handler tolerates undefined value (double-delete race)', async () => {
+      // deleteWithMeta does `const [value] = DELETE ... RETURNING`.  When the record
+      // is already gone (double-delete race now possible with pub/sub enabled) the
+      // RETURNING clause yields 0 rows → value = undefined.  The server then broadcasts
+      // [undefined, meta].  The handler crashes on `undefined.uid` (TypeError) before
+      // db.metadata.put(meta) runs, leaving other tabs' caches inconsistent.
+      const modelName = `model${++dbCounter}`
+
+      const serverApp = expressX({})
+      serverApp.addConnectListener(socket => serverApp.joinChannel('all', socket))
+      await new Promise(resolve => serverApp.httpServer.listen(0, resolve))
+      const port = serverApp.httpServer.address().port
+
+      function connectClient() {
+         const socket = ioc(`http://localhost:${port}`, { transports: ['websocket'], autoConnect: false })
+         const app = createClient(socket, { debug: false })
+         offlinePlugin(app)
+         socket.connect()
+         return new Promise((resolve, reject) => {
+            socket.on('connect', () => resolve({ app, socket }))
+            socket.on('connect_error', reject)
+         })
+      }
+
+      const { app: appB, socket: socketB } = await connectClient()
+      const modelB = appB.createOfflineModel(modelName, ['label'])
+
+      // Pre-populate so we can verify the metadata gets the server's deleted_at
+      await modelB.db.values.add({ uid: 'r1', label: 'existing' })
+      await modelB.db.metadata.add({ uid: 'r1', created_at: T0 })
+
+      // Simulate the server broadcasting deleteWithMeta with undefined value
+      // (what happens when the DELETE RETURNING yields 0 rows)
+      serverApp.io.to('all').emit('service-event', {
+         name: modelName,
+         action: 'deleteWithMeta',
+         result: [undefined, { uid: 'r1', created_at: T0, updated_at: null, deleted_at: T1 }],
+      })
+
+      await new Promise(r => setTimeout(r, 200))
+
+      // With bug:  TypeError on undefined.uid aborts the handler before
+      //            db.metadata.put(meta) runs → deleted_at stays T0.
+      // With fix:  handler guards value, skips the delete, still puts the metadata
+      //            → deleted_at becomes T1.
+      const meta = await modelB.db.metadata.get('r1')
+      assert.equal(
+         meta?.deleted_at?.toISOString?.() ?? String(meta?.deleted_at),
+         T1.toISOString(),
+         'metadata deleted_at must be updated even when value is undefined',
+      )
+
+      socketB.disconnect()
+      await new Promise(resolve => serverApp.httpServer.close(resolve))
+   })
+
    test('update() rollback only restores updated_at, not deleted_at set by a concurrent remove()', async () => {
       // The optimistic write in update() only touches updated_at.  The rollback on
       // server rejection spreads the full previousMetadata snapshot — including
