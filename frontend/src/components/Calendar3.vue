@@ -33,6 +33,7 @@ const currentMonth = ref(today.getMonth())
 const selectionStart = ref(null)
 const selectionEnd = ref(null)
 const isDragging = ref(false)
+const hasMoved = ref(false) // true once the pointer moves during a drag
 const dragAnchor = ref(null) // the end that stays fixed during a drag
 const selectedRangeUid = ref(null) // uid of the range being edited, null for a fresh selection
 
@@ -145,6 +146,7 @@ function onBarClick(seg) {
    selectedRangeUid.value = seg.uid
    emit('range-selected', seg.uid)
    isDragging.value = true
+   hasMoved.value = false  // reset: no movement yet, so no 'update' on plain click
 }
 
 function dayClasses(date) {
@@ -176,6 +178,7 @@ function nextMonth() {
 
 function startDrag(date) {
    isDragging.value = true
+   hasMoved.value = false
    const { start, end } = activeRange.value
    const isHandle = (start && date.getTime() === start.getTime()) || (end && date.getTime() === end.getTime())
    if (!isHandle) {
@@ -195,15 +198,22 @@ function startDrag(date) {
 function onMouseDown(date) { startDrag(date) }
 
 function onMouseEnter(date) {
-   if (isDragging.value) selectionEnd.value = date
+   if (isDragging.value) {
+      selectionEnd.value = date
+      hasMoved.value = true
+   }
 }
 
 function onDragEnd() {
    if (!isDragging.value) return
    isDragging.value = false
+   const moved = hasMoved.value
+   hasMoved.value = false
    if (!activeRange.value.start) return
    if (selectedRangeUid.value) {
-      emit('update', { uid: selectedRangeUid.value, start: activeRange.value.start, end: activeRange.value.end })
+      // Only persist the change when the user actually dragged — a plain click on a
+      // bar selects it visually but must not trigger an 'update' write.
+      if (moved) emit('update', { uid: selectedRangeUid.value, start: activeRange.value.start, end: activeRange.value.end })
    } else {
       emit('select', { start: activeRange.value.start, end: activeRange.value.end })
    }
@@ -220,6 +230,7 @@ function onTouchMove(event) {
    const cell = el?.closest('[data-date]')
    if (cell?.dataset.date) {
       selectionEnd.value = new Date(cell.dataset.date)
+      hasMoved.value = true
    }
 }
 
