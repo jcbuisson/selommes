@@ -14,7 +14,7 @@ export default function(app) {
       return await roomsToPublish(context);
    })
 
-   app.service('selection').publish(async (context) => {
+   app.service('range').publish(async (context) => {
       return await roomsToPublish(context);
    })
 

@@ -426,7 +426,11 @@ export function offlinePlugin(app) {
          if (addClient.length > 0) {
             await idbValues.db.transaction('rw', [idbValues, idbMetadata], async () => {
                for (const [value, metaData] of addClient) {
-                  await idbValues.add(value)
+                  // put() instead of add(): if create() ran concurrently and added this
+                  // uid to Dexie between the idbValues.filter snapshot and this step,
+                  // add() would throw ConstraintError and abort the entire transaction,
+                  // silently dropping every other addClient record in the batch.
+                  await idbValues.put(value)
                   await idbMetadata.put(metaData)
                }
             })

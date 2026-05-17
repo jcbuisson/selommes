@@ -479,6 +479,56 @@ describe('Full client ↔ server protocol', () => {
       await new Promise(resolve => serverApp2.httpServer.close(resolve))
    })
 
+   test('addClient uses put (upsert) so a concurrent create does not cause ConstraintError', async () => {
+      // create() adds a uid to Dexie between synchronize()'s idbValues.filter snapshot
+      // and the addClient step.  Because the uid missed the snapshot it is absent from
+      // clientMetadataDict, so the server puts it in addClient.  idbValues.add() then
+      // throws ConstraintError which aborts the entire transaction, silently dropping all
+      // other addClient records in the same batch.
+      // Fix: use idbValues.put() (upsert) so a pre-existing uid is handled gracefully.
+      const modelName = `model${++dbCounter}`
+      const { db, metaTable, modelTable } = await createTestDb(modelName)
+
+      await db.insert(modelTable).values({ uid: 'r1', label: 'server-r1' })
+      await db.insert(metaTable).values({ uid: 'r1', created_at: T0 })
+      await db.insert(modelTable).values({ uid: 'r2', label: 'server-r2' })
+      await db.insert(metaTable).values({ uid: 'r2', created_at: T0 })
+
+      const { clientApp, cleanup } = await createTestContext(serverApp => {
+         // Custom sync that always returns BOTH r1 and r2 in addClient,
+         // regardless of what the client already has — simulating the race where
+         // r1 was added to Dexie after the clientMetadataDict snapshot.
+         serverApp.createService('sync', {
+            go: async () => ({
+               addClient: [
+                  [{ uid: 'r1', label: 'server-r1' }, { uid: 'r1', created_at: T0, updated_at: null, deleted_at: null }],
+                  [{ uid: 'r2', label: 'server-r2' }, { uid: 'r2', created_at: T0, updated_at: null, deleted_at: null }],
+               ],
+               updateClient: [], deleteClient: [], addDatabase: [], updateDatabase: [],
+            }),
+         })
+      }, { useOfflinePlugin: true })
+
+      try {
+         const model = clientApp.createOfflineModel(modelName, ['label'])
+
+         // r1 is already in Dexie (simulates what create() does concurrently)
+         await model.db.values.add({ uid: 'r1', label: 'client-r1' })
+         await model.db.metadata.add({ uid: 'r1', created_at: T0 })
+
+         await model.addSynchroWhere({})
+         await model.synchronizeAll()
+
+         // r2 must still be in Dexie even though r1 caused a uid conflict —
+         // the put() upsert must not abort the whole transaction
+         const r2 = await model.db.values.get('r2')
+         assert.ok(r2, 'r2 must be added despite r1 already existing in Dexie')
+         assert.equal(r2.label, 'server-r2')
+      } finally {
+         await cleanup()
+      }
+   })
+
    test('missing server metadata does not cause infinite updateClient loop', async () => {
       // When a record exists in the model table but has no metadata row,
       // computeSyncResult falls back to { uid, created_at: new Date() }.
