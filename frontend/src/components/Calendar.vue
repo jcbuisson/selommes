@@ -1,6 +1,17 @@
 <script setup>
-import { ref, computed } from 'vue'
+/***
+ * Architecture: weekday-labels row + 6 week blocks. Each week block is its own 7-column grid.
+ * Day cells are pinned to grid-row: 1. Range bars have no explicit grid-row, so CSS grid's auto-placement algorithm
+ * packs them into rows 2, 3, … — automatically putting non-overlapping bars on the same row (stacking only when they share columns).
+ * 
+ * Bar segments: for each range × week intersection, the code computes:
+ *    - colStart / colSpan — which cells the bar occupies in that week
+ *    - startsHere / endsHere — whether to round the left/right caps or leave them square for continuity across week breaks
+ * 
+ * Label: shown only on the first segment of a range (startsHere), with text-overflow: ellipsis for narrow bars.  
+*/
 
+import { ref, computed } from 'vue'
 
 const MONTH_NAMES = [
    'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -8,7 +19,12 @@ const MONTH_NAMES = [
 ]
 const WEEKDAY_LABELS = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di']
 
-const emit = defineEmits(['select'])
+const props = defineProps({
+   // [{ label: String, color: String, start: Date|string, end: Date|string }]
+   ranges: { type: Array, default: () => [] },
+})
+
+const emit = defineEmits(['select', 'update', 'range-selected'])
 
 const today = new Date()
 const currentYear = ref(today.getFullYear())
@@ -17,6 +33,9 @@ const currentMonth = ref(today.getMonth())
 const selectionStart = ref(null)
 const selectionEnd = ref(null)
 const isDragging = ref(false)
+const hasMoved = ref(false) // true once the pointer moves during a drag
+const dragAnchor = ref(null) // the end that stays fixed during a drag
+const selectedRangeUid = ref(null) // uid of the range being edited, null for a fresh selection
 
 const monthLabel = computed(() =>
    `${MONTH_NAMES[currentMonth.value]} ${currentYear.value}`
@@ -25,7 +44,7 @@ const monthLabel = computed(() =>
 const daysInGrid = computed(() => {
    const firstDay = new Date(currentYear.value, currentMonth.value, 1)
    const lastDay = new Date(currentYear.value, currentMonth.value + 1, 0)
-   const startPad = (firstDay.getDay() + 6) % 7 // 0 = Monday
+   const startPad = (firstDay.getDay() + 6) % 7
 
    const days = []
    for (let i = startPad; i > 0; i--) {
@@ -41,16 +60,97 @@ const daysInGrid = computed(() => {
    return days
 })
 
-// Always keep start <= end for rendering
-const range = computed(() => {
+// Group flat 42-cell grid into 6 weeks of 7 days
+const weeks = computed(() => {
+   const g = daysInGrid.value
+   return Array.from({ length: 6 }, (_, i) => g.slice(i * 7, (i + 1) * 7))
+})
+
+// Always keep start <= end for the active drag selection
+const activeRange = computed(() => {
    if (!selectionStart.value || !selectionEnd.value) return { start: null, end: null }
    return selectionStart.value <= selectionEnd.value
       ? { start: selectionStart.value, end: selectionEnd.value }
       : { start: selectionEnd.value, end: selectionStart.value }
 })
 
+// Prop ranges with Date objects normalised and a stable band index
+const normalizedRanges = computed(() =>
+   props.ranges.map((r, i) => ({
+      ...r,
+      band: i,
+      start: r.start instanceof Date ? r.start : new Date(r.start),
+      end:   r.end   instanceof Date ? r.end   : new Date(r.end),
+   }))
+)
+
+// For each week, slice every range into a segment (colStart, colSpan, caps)
+const weekSegments = computed(() =>
+   weeks.value.map(weekDays => {
+      const ws = weekDays[0].date.getTime()
+      const we = weekDays[6].date.getTime()
+      const segs = []
+
+      for (const r of normalizedRanges.value) {
+         const rs = r.start.getTime()
+         const re = r.end.getTime()
+         if (re < ws || rs > we) continue
+
+         let firstCol = -1, lastCol = -1
+         for (let i = 0; i < 7; i++) {
+            const t = weekDays[i].date.getTime()
+            if (t >= rs && t <= re) {
+               if (firstCol === -1) firstCol = i
+               lastCol = i
+            }
+         }
+         if (firstCol === -1) continue
+
+         segs.push({
+            key: r.label + weekDays[0].date.toISOString(),
+            uid: r.uid,
+            label: r.label,
+            color: r.color,
+            rangeStart: r.start,
+            rangeEnd:   r.end,
+            colStart: firstCol + 1, // CSS grid is 1-based
+            colSpan: lastCol - firstCol + 1,
+            startsHere: rs >= ws,
+            endsHere:   re <= we,
+         })
+      }
+
+      return segs
+   })
+)
+
+// Inline style for each bar segment: grid placement + rounded caps + color
+function barStyle(seg) {
+   const tl = seg.startsHere ? '6px' : '0'
+   const tr = seg.endsHere   ? '6px' : '0'
+   const br = seg.endsHere   ? '6px' : '0'
+   const bl = seg.startsHere ? '6px' : '0'
+   return {
+      gridColumn: `${seg.colStart} / span ${seg.colSpan}`,
+      background: seg.color,
+      borderRadius: `${tl} ${tr} ${br} ${bl}`,
+      // small gap at the cap ends so the bar doesn't touch the cell edge
+      marginLeft:  seg.startsHere ? '2px' : '0',
+      marginRight: seg.endsHere   ? '2px' : '0',
+   }
+}
+
+function onBarClick(seg) {
+   selectionStart.value = seg.rangeStart
+   selectionEnd.value = seg.rangeEnd
+   selectedRangeUid.value = seg.uid
+   emit('range-selected', seg.uid)
+   isDragging.value = true
+   hasMoved.value = false  // reset: no movement yet, so no 'update' on plain click
+}
+
 function dayClasses(date) {
-   const { start, end } = range.value
+   const { start, end } = activeRange.value
    if (!start) return {}
    const t = date.getTime()
    const inRange = t >= start.getTime() && t <= end.getTime()
@@ -71,33 +171,57 @@ function nextMonth() {
    else currentMonth.value++
 }
 
-// ── Mouse ──────────────────────────────────────────────────────────────────
+// ── Drag helpers ───────────────────────────────────────────────────────────
+// If the grabbed date is a handle of the current selection, pin the opposite
+// end as the anchor so the user edits just that one side.
+// Otherwise start a fresh selection anchored at the clicked date.
 
-function onMouseDown(date) {
+function startDrag(date) {
    isDragging.value = true
-   selectionStart.value = date
+   hasMoved.value = false
+   const { start, end } = activeRange.value
+   const isHandle = (start && date.getTime() === start.getTime()) || (end && date.getTime() === end.getTime())
+   if (!isHandle) {
+      selectedRangeUid.value = null
+      emit('range-selected', null)
+   }
+   dragAnchor.value =
+      start && date.getTime() === start.getTime() ? end :
+      end   && date.getTime() === end.getTime()   ? start :
+      date
+   selectionStart.value = dragAnchor.value
    selectionEnd.value = date
 }
 
+// ── Mouse ──────────────────────────────────────────────────────────────────
+
+function onMouseDown(date) { startDrag(date) }
+
 function onMouseEnter(date) {
-   if (isDragging.value) selectionEnd.value = date
+   if (isDragging.value) {
+      selectionEnd.value = date
+      hasMoved.value = true
+   }
 }
 
 function onDragEnd() {
    if (!isDragging.value) return
    isDragging.value = false
-   if (range.value.start) emit('select', { start: range.value.start, end: range.value.end })
+   const moved = hasMoved.value
+   hasMoved.value = false
+   if (!activeRange.value.start) return
+   if (selectedRangeUid.value) {
+      // Only persist the change when the user actually dragged — a plain click on a
+      // bar selects it visually but must not trigger an 'update' write.
+      if (moved) emit('update', { uid: selectedRangeUid.value, start: activeRange.value.start, end: activeRange.value.end })
+   } else {
+      emit('select', { start: activeRange.value.start, end: activeRange.value.end })
+   }
 }
 
 // ── Touch ──────────────────────────────────────────────────────────────────
-// touchmove fires on the element where the touch started, not under the finger.
-// We use elementFromPoint + closest('[data-date]') to resolve the current cell.
 
-function onTouchStart(date) {
-   isDragging.value = true
-   selectionStart.value = date
-   selectionEnd.value = date
-}
+function onTouchStart(date) { startDrag(date) }
 
 function onTouchMove(event) {
    if (!isDragging.value) return
@@ -106,16 +230,25 @@ function onTouchMove(event) {
    const cell = el?.closest('[data-date]')
    if (cell?.dataset.date) {
       selectionEnd.value = new Date(cell.dataset.date)
+      hasMoved.value = true
    }
 }
 
 function formatDate(date) {
    return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 }
+
+function clearSelection() {
+   selectionStart.value = null
+   selectionEnd.value = null
+   selectedRangeUid.value = null
+}
+
+defineExpose({ clearSelection })
 </script>
 
 <template>
-   <div class="calendar" @mouseup="onDragEnd" @mouseleave="onDragEnd">
+   <div class="calendar" @mouseup="onDragEnd" @mouseleave="onDragEnd" @touchend="onDragEnd">
 
       <!-- header -->
       <div class="calendar-header">
@@ -124,16 +257,20 @@ function formatDate(date) {
          <button class="nav-btn" @click="nextMonth">&#8250;</button>
       </div>
 
-      <!-- grid with selections -->
-      <div
-         class="calendar-grid"
-         @touchmove.prevent="onTouchMove"
-         @touchend="onDragEnd"
-      >
+      <!-- weekday labels (shared across all weeks) -->
+      <div class="weekday-labels">
          <div class="weekday-label" v-for="d in WEEKDAY_LABELS" :key="d">{{ d }}</div>
+      </div>
 
+      <!-- 6 week blocks: day cells in row 1, range bars auto-flow into rows 2+ -->
+      <div
+         v-for="(week, wi) in weeks"
+         :key="wi"
+         class="week-block"
+         @touchmove.prevent="onTouchMove"
+      >
          <div
-            v-for="day in daysInGrid"
+            v-for="day in week"
             :key="day.date.toISOString()"
             class="day-cell"
             :class="[dayClasses(day.date), { 'other-month': !day.inMonth }]"
@@ -144,16 +281,16 @@ function formatDate(date) {
          >
             {{ day.date.getDate() }}
          </div>
-      </div>
 
-      <!-- footer-->
-      <div v-if="range.start" class="selection-info">
-         <template v-if="range.start.getTime() === range.end.getTime()">
-            {{ formatDate(range.start) }}
-         </template>
-         <template v-else>
-            {{ formatDate(range.start) }} &rarr; {{ formatDate(range.end) }}
-         </template>
+         <div
+            v-for="seg in weekSegments[wi]"
+            :key="seg.key"
+            class="range-bar"
+            :style="barStyle(seg)"
+            @mousedown.stop="onBarClick(seg)"
+         >
+            <span v-if="seg.startsHere" class="bar-label">{{ seg.label }}</span>
+         </div>
       </div>
    </div>
 </template>
@@ -161,9 +298,11 @@ function formatDate(date) {
 <style scoped>
 .calendar {
    user-select: none;
-   width: 320px;
+   width: 100%;
+   box-sizing: border-box;
    background: #1e1e2e;
-   border-radius: 16px;
+   border: 1px solid #313244;
+   border-radius: 0 0 12px 12px;
    padding: 16px;
    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
    color: #cdd6f4;
@@ -198,11 +337,11 @@ function formatDate(date) {
    font-weight: 600;
 }
 
-/* ── Grid ── */
-.calendar-grid {
+/* ── Weekday labels ── */
+.weekday-labels {
    display: grid;
    grid-template-columns: repeat(7, 1fr);
-   touch-action: none; /* Prevents scroll-fighting during drag */
+   margin-bottom: 2px;
 }
 
 .weekday-label {
@@ -213,11 +352,25 @@ function formatDate(date) {
    padding-bottom: 6px;
 }
 
+/* ── Week blocks ── */
+/* Each block is a 7-column grid.
+   Day cells go in row 1 (explicit).
+   Range bars have no grid-row — CSS auto-placement packs them into rows 2+,
+   fitting non-overlapping bars into the same row automatically. */
+.week-block {
+   display: grid;
+   grid-template-columns: repeat(7, 1fr);
+   touch-action: none;
+   margin-top: 8px;
+}
+
+/* ── Day cells ── */
 .day-cell {
+   grid-row: 1;
    display: flex;
    align-items: center;
    justify-content: center;
-   height: 40px;
+   height: 36px;
    font-size: 0.88em;
    border-radius: 8px;
    cursor: pointer;
@@ -232,43 +385,52 @@ function formatDate(date) {
    color: #45475a;
 }
 
-/* ── Range highlight ── */
-
-/* Middle days */
+/* ── Active selection highlight ── */
 .day-cell.in-range {
    background: rgba(137, 180, 250, 0.18);
    border-radius: 0;
    color: #cdd6f4;
 }
 
-/* Start cap */
 .day-cell.range-start {
    background: #89b4fa;
    border-radius: 8px 0 0 8px;
    color: #1e1e2e;
    font-weight: 700;
+   cursor: ew-resize;
 }
 
-/* End cap */
 .day-cell.range-end {
    background: #89b4fa;
    border-radius: 0 8px 8px 0;
    color: #1e1e2e;
    font-weight: 700;
+   cursor: ew-resize;
 }
 
-/* Single-day selection */
 .day-cell.range-start.range-end {
    border-radius: 8px;
 }
 
-/* ── Footer ── */
-.selection-info {
-   margin-top: 12px;
-   text-align: center;
-   font-size: 0.82em;
-   color: #a6adc8;
-   min-height: 1.2em;
+/* ── Range bars ── */
+.range-bar {
+   height: 16px;
+   margin: 1px 0;
+   display: flex;
+   align-items: center;
+   overflow: hidden;
+   min-width: 0;
+   cursor: pointer;
+}
+
+.bar-label {
+   font-size: 0.68em;
+   font-weight: 600;
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+   padding: 0 5px;
+   color: rgba(0, 0, 0, 0.65);
 }
 
 /* ── Light mode ── */
@@ -276,6 +438,7 @@ function formatDate(date) {
    .calendar {
       background: #ffffff;
       color: #213547;
+      border-color: #e5e7eb;
       box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
    }
 
@@ -312,10 +475,6 @@ function formatDate(date) {
    .day-cell.range-end {
       background: #6366f1;
       color: #ffffff;
-   }
-
-   .selection-info {
-      color: #6b7280;
    }
 }
 </style>

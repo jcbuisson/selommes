@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { useObservable } from '@vueuse/rxjs'
 import { mdiCalendarPlus, mdiDelete } from '@mdi/js'
 
-import Calendar3 from '/src/components/Calendar3.vue'
+import Calendar from '/src/components/Calendar.vue'
 
 import useRange from '/src/use/useRange';
 
@@ -70,7 +70,7 @@ async function deleteSelectedRange() {
          </button>
       </header>
 
-      <Calendar3 ref="calendarRef" :ranges="ranges" @select="onSelect" @update="onUpdate" @range-selected="uid => selectedRangeUid = uid" />
+      <Calendar ref="calendarRef" :ranges="ranges" @select="onSelect" @update="onUpdate" @range-selected="uid => selectedRangeUid = uid" />
 
       <div v-if="showModal" class="modal-backdrop" @click.self="cancelCreate">
          <div class="modal">
