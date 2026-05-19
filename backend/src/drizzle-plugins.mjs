@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs'
 
 import { and, eq, gt, gte, lt, lte, isNull, getTableName } from "drizzle-orm";
 
-import { metadata } from '#root/src/db/schema.js';
+// import { metadata } from '#root/src/db/schema.js';
 import { Mutex, truncateString } from '@jcbuisson/express-x'
 
 

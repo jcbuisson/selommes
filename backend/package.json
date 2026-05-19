@@ -27,13 +27,11 @@
   },
   "contributors": [],
   "scripts": {
-    "dev": "node --watch --experimental-strip-types src/app.js",
-    "start": "node --experimental-strip-types src/app.js",
-    "test": "node --experimental-strip-types --test test/sync.test.mjs test/dialog.real.test.mjs"
+    "dev": "node --watch --import tsx/esm src/app.js"
   },
   "dependencies": {
-    "@jcbuisson/express-x": "^3.0.3",
-    "@jcbuisson/express-x-drizzle": "^1.0.3",
+    "@jcbuisson/express-x": "^3.1.0",
+    "@jcbuisson/express-x-drizzle": "^1.0.7",
     "@prisma/adapter-pg": "^7.4.1",
     "@prisma/client": "^7.4.1",
     "dotenv": "^17.4.2",

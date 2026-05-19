@@ -1,6 +1,5 @@
 import { io } from "socket.io-client";
-// import { createClient, reloadPlugin, offlinePlugin } from "@jcbuisson/express-x-client";
-import { createClient, reloadPlugin, offlinePlugin } from "/src/client.mts";
+import { createClient, reloadPlugin, offlinePlugin } from "@jcbuisson/express-x-client";
 
 
 const socketOptions = {
