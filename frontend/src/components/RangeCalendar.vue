@@ -192,7 +192,6 @@ function startDrag(date) {
    const isHandle = (start && date.getTime() === start.getTime()) || (end && date.getTime() === end.getTime())
    if (!isHandle) {
       selectedRangeUid.value = null
-      emit('range-selected', null)
    }
    dragAnchor.value =
       start && date.getTime() === start.getTime() ? end :
