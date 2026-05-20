@@ -20,11 +20,17 @@ const MONTH_NAMES = [
 const WEEKDAY_LABELS = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di']
 
 const props = defineProps({
-   // [{ label: String, color: String, start: Date|string, end: Date|string }]
-   ranges: { type: Array, default: () => [] },
+   ranges: {
+      type: Array,
+      default: () => [],
+   },
 })
 
-const emit = defineEmits(['select', 'update', 'range-selected'])
+const emit = defineEmits([
+   'new-range',
+   'update',
+   'range-selected',
+])
 
 const today = new Date()
 const currentYear = ref(today.getFullYear())
@@ -215,7 +221,7 @@ function onDragEnd() {
       // bar selects it visually but must not trigger an 'update' write.
       if (moved) emit('update', { uid: selectedRangeUid.value, start: activeRange.value.start, end: activeRange.value.end })
    } else {
-      emit('select', { start: activeRange.value.start, end: activeRange.value.end })
+      emit('new-range', { start: activeRange.value.start, end: activeRange.value.end })
    }
 }
 

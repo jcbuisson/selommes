@@ -18,7 +18,8 @@ const labelInput = ref('')
 const selectedRangeUid = ref(null)
 const calendarRef = ref(null)
 
-async function onSelect({ start, end }) {
+async function onNewRange({ start, end }) {
+   console.log('select!')
    try {
       // labelInput.value = ''
       // showModal.value = true
@@ -47,7 +48,13 @@ function cancelCreate() {
    showModal.value = false
 }
 
-async function onUpdate({ uid, start, end }) {
+function onSelectRange(uid) {
+   console.log('range-selected!')
+   selectedRangeUid.value = uid
+}
+
+async function onUpdateRange({ uid, start, end }) {
+   console.log('update!')
    await updateRange(uid, { start, end })
    calendarRef.value?.clearSelection()
 }
@@ -76,7 +83,7 @@ async function deleteSelectedRange() {
          </button>
       </header>
 
-      <RangeCalendar ref="calendarRef" :ranges="ranges" @select="onSelect" @update="onUpdate" @range-selected="uid => selectedRangeUid = uid" />
+      <RangeCalendar ref="calendarRef" :ranges="ranges" @new-range="onNewRange" @update="onUpdateRange" @range-selected="onSelectRange" />
 
       <div v-if="showModal" class="modal-backdrop" @click.self="cancelCreate">
          <div class="modal">
