@@ -25,8 +25,9 @@ async function onSubmit() {
       color: color.value,
    })
    console.log('user', user);
-   localStorage.setItem('user_uid', user.uid);
-   localStorage.setItem('color', user.color);
+   localStorage.setItem('selommes_user_uid', user.uid);
+   localStorage.setItem('selommes_color', user.color);
+   localStorage.setItem('selommes_name', user.name);
    router.push('/agenda');
 }
 </script>

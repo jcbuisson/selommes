@@ -11,8 +11,9 @@ const email = ref('')
 async function onSubmit() {
    const user = await app.service('user').findUnique({ email: email.value });
    if (user) {
-      localStorage.setItem('user_uid', user.uid);
-      localStorage.setItem('color', user.color);
+      localStorage.setItem('selommes_user_uid', user.uid);
+      localStorage.setItem('selommes_color', user.color);
+      localStorage.setItem('selommes_name', user.name);
       router.push('/agenda')
    } else {
       router.push({

@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { useObservable } from '@vueuse/rxjs'
 import { mdiCalendarPlus, mdiDelete } from '@mdi/js'
 
-import Calendar from '/src/components/Calendar.vue'
+import RangeCalendar from '/src/components/RangeCalendar.vue'
 
 import useRange from '/src/use/useRange';
 
@@ -19,20 +19,32 @@ const labelInput = ref('')
 const selectedRangeUid = ref(null)
 const calendarRef = ref(null)
 
-function onSelect({ start, end }) {
-   pendingRange.value = { start, end }
-   labelInput.value = ''
-   showModal.value = true
+async function onSelect({ start, end }) {
+   try {
+      pendingRange.value = { start, end }
+      // labelInput.value = ''
+      // showModal.value = true
+      await createRange({
+         label: localStorage.getItem('selommes_name'),
+         color: localStorage.getItem('selommes_color'),
+         start, end,
+         user_uid: localStorage.getItem('selommes_user_uid'),
+      })
+   } catch(err) {
+
+   } finally {
+      pendingRange.value = null
+   }
 }
 
 async function confirmCreate() {
    const { start, end } = pendingRange.value
    showModal.value = false
    await createRange({
-      label: labelInput.value,
-      color: localStorage.color,
+      label: localStorage.getItem('selommes_name'),
+      color: localStorage.getItem('selommes_color'),
       start, end,
-      user_uid: localStorage.user_uid,
+      user_uid: localStorage.getItem('selommes_user_uid'),
    })
 }
 
@@ -70,7 +82,7 @@ async function deleteSelectedRange() {
          </button>
       </header>
 
-      <Calendar ref="calendarRef" :ranges="ranges" @select="onSelect" @update="onUpdate" @range-selected="uid => selectedRangeUid = uid" />
+      <RangeCalendar ref="calendarRef" :ranges="ranges" @select="onSelect" @update="onUpdate" @range-selected="uid => selectedRangeUid = uid" />
 
       <div v-if="showModal" class="modal-backdrop" @click.self="cancelCreate">
          <div class="modal">

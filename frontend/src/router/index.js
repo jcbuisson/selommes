@@ -53,7 +53,7 @@ router.beforeEach(async (to, from) => {
    }
 
    if (to.meta.requiresAuth) {
-      const user_uid = localStorage.getItem('user_uid');
+      const user_uid = localStorage.getItem('selommes_user_uid');
       console.log('user_uid', user_uid);
       if (!user_uid) return { path: '/auth'};
    }
