@@ -14,14 +14,12 @@ const { getObservable: ranges$, create: createRange, update: updateRange, remove
 const ranges = useObservable(ranges$({}))
 
 const showModal = ref(false)
-const pendingRange = ref(null)
 const labelInput = ref('')
 const selectedRangeUid = ref(null)
 const calendarRef = ref(null)
 
 async function onSelect({ start, end }) {
    try {
-      pendingRange.value = { start, end }
       // labelInput.value = ''
       // showModal.value = true
       await createRange({
@@ -30,15 +28,12 @@ async function onSelect({ start, end }) {
          start, end,
          user_uid: localStorage.getItem('selommes_user_uid'),
       })
-   } catch(err) {
-
    } finally {
-      pendingRange.value = null
+      calendarRef.value?.clearSelection()
    }
 }
 
 async function confirmCreate() {
-   const { start, end } = pendingRange.value
    showModal.value = false
    await createRange({
       label: localStorage.getItem('selommes_name'),
@@ -50,7 +45,6 @@ async function confirmCreate() {
 
 function cancelCreate() {
    showModal.value = false
-   pendingRange.value = null
 }
 
 async function onUpdate({ uid, start, end }) {
