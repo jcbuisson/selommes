@@ -56,7 +56,7 @@ function onSelectRange(uid) {
 async function onUpdateRange({ uid, start, end }) {
    console.log('update!')
    await updateRange(uid, { start, end })
-   calendarRef.value?.clearSelection()
+   // calendarRef.value?.clearSelection()
 }
 
 async function deleteSelectedRange() {

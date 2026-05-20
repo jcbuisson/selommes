@@ -27,9 +27,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits([
-   'new-range',
-   'update',
-   'range-selected',
+   'new-range',      // a new range is created by draging date numbers
+   'update',         // after a range selection, a start or end boundary is changed
+   'range-selected', // a range is selected
 ])
 
 const today = new Date()
@@ -42,6 +42,7 @@ const isDragging = ref(false)
 const hasMoved = ref(false) // true once the pointer moves during a drag
 const dragAnchor = ref(null) // the end that stays fixed during a drag
 const selectedRangeUid = ref(null) // uid of the range being edited, null for a fresh selection
+const lastDragDate = ref(null) // last date reached during drag, to suppress duplicate emits
 
 const monthLabel = computed(() =>
    `${MONTH_NAMES[currentMonth.value]} ${currentYear.value}`
@@ -152,7 +153,8 @@ function onBarClick(seg) {
    selectedRangeUid.value = seg.uid
    emit('range-selected', seg.uid)
    isDragging.value = true
-   hasMoved.value = false  // reset: no movement yet, so no 'update' on plain click
+   hasMoved.value = false
+   lastDragDate.value = null
 }
 
 function dayClasses(date) {
@@ -185,6 +187,7 @@ function nextMonth() {
 function startDrag(date) {
    isDragging.value = true
    hasMoved.value = false
+   lastDragDate.value = null
    const { start, end } = activeRange.value
    const isHandle = (start && date.getTime() === start.getTime()) || (end && date.getTime() === end.getTime())
    if (!isHandle) {
@@ -199,29 +202,38 @@ function startDrag(date) {
    selectionEnd.value = date
 }
 
+// ── Drag-move helper ───────────────────────────────────────────────────────
+// Called on every mouse-enter or touch-move during a drag.
+// Emits 'update' each time the pointer reaches a new date (for existing ranges).
+
+function moveDragTo(date) {
+   if (!isDragging.value) return
+   if (lastDragDate.value && date.getTime() === lastDragDate.value.getTime()) return
+   selectionEnd.value = date
+   hasMoved.value = true
+   lastDragDate.value = date
+   if (selectedRangeUid.value) {
+      emit('update', { uid: selectedRangeUid.value, start: activeRange.value.start, end: activeRange.value.end })
+   }
+}
+
 // ── Mouse ──────────────────────────────────────────────────────────────────
 
 function onMouseDown(date) { startDrag(date) }
 
-function onMouseEnter(date) {
-   if (isDragging.value) {
-      selectionEnd.value = date
-      hasMoved.value = true
-   }
-}
+function onMouseEnter(date) { moveDragTo(date) }
 
 function onDragEnd() {
    if (!isDragging.value) return
    isDragging.value = false
    const moved = hasMoved.value
    hasMoved.value = false
+   lastDragDate.value = null
    if (!activeRange.value.start) return
-   if (selectedRangeUid.value) {
-      // Only persist the change when the user actually dragged — a plain click on a
-      // bar selects it visually but must not trigger an 'update' write.
-      if (moved) emit('update', { uid: selectedRangeUid.value, start: activeRange.value.start, end: activeRange.value.end })
-   } else {
-      emit('new-range', { start: activeRange.value.start, end: activeRange.value.end })
+   if (!selectedRangeUid.value) {
+      // 'update' for existing ranges is emitted during the drag via moveDragTo;
+      // only new selections are finalised here.
+      if (moved) emit('new-range', { start: activeRange.value.start, end: activeRange.value.end })
    }
 }
 
@@ -234,10 +246,7 @@ function onTouchMove(event) {
    const touch = event.touches[0]
    const el = document.elementFromPoint(touch.clientX, touch.clientY)
    const cell = el?.closest('[data-date]')
-   if (cell?.dataset.date) {
-      selectionEnd.value = new Date(cell.dataset.date)
-      hasMoved.value = true
-   }
+   if (cell?.dataset.date) moveDragTo(new Date(cell.dataset.date))
 }
 
 function formatDate(date) {
