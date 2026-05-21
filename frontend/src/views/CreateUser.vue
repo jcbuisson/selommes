@@ -4,10 +4,11 @@ import { useRouter } from 'vue-router'
 
 import useUser from '/src/use/useUser'
 import { app } from '/src/client-app.ts'
+import COLORS from '/src/colors.mjs'
 
 const props = defineProps({
    email: { type: String, default: '' },
-   color: { type: String, default: '#89b4fa' },
+   color: { type: String, default: '' },
 })
 
 const { create: createUser } = useUser(app)
@@ -16,7 +17,7 @@ const router = useRouter()
 
 const email = ref(props.email)
 const name = ref('')
-const color = ref(props.color)
+const color = ref(COLORS.includes(props.color) ? props.color : COLORS[0])
 
 async function onSubmit() {
    const user = await createUser({
@@ -63,13 +64,18 @@ async function onSubmit() {
          </div>
 
          <div class="field">
-            <label class="field-label" for="color">Couleur</label>
-            <input
-               id="color"
-               v-model="color"
-               class="field-input color-input"
-               type="color"
-            />
+            <label class="field-label">Couleur</label>
+            <div class="color-swatches">
+               <button
+                  v-for="c in COLORS"
+                  :key="c"
+                  type="button"
+                  class="swatch"
+                  :class="{ selected: c === color }"
+                  :style="{ background: c }"
+                  @click="color = c"
+               />
+            </div>
          </div>
 
          <button class="submit-btn" type="submit" :disabled="!email.trim() || !name.trim()">Créer</button>
@@ -133,10 +139,30 @@ async function onSubmit() {
    border-color: #89b4fa;
 }
 
-.color-input {
-   padding: 0.25rem 0.4rem;
-   height: 40px;
+.color-swatches {
+   display: flex;
+   flex-wrap: wrap;
+   gap: 8px;
+}
+
+.swatch {
+   width: 28px;
+   height: 28px;
+   border-radius: 50%;
+   border: 2px solid transparent;
    cursor: pointer;
+   padding: 0;
+   outline: none;
+   transition: transform 0.1s, border-color 0.1s;
+}
+
+.swatch:hover {
+   transform: scale(1.15);
+}
+
+.swatch.selected {
+   border-color: #cdd6f4;
+   transform: scale(1.15);
 }
 
 .submit-btn {

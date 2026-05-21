@@ -1,0 +1,22 @@
+export default [
+   '#ef6c6c', // red
+   '#f0904a', // orange
+   '#f5c842', // yellow
+   '#a8d44a', // lime
+   '#4cba6e', // green
+   '#3ec9a7', // teal
+   '#38bcd8', // cyan
+   '#4a90e2', // blue
+   '#6b7fe8', // periwinkle
+   '#9b6be8', // purple
+   '#c45fd0', // violet
+   '#e85fa0', // pink
+   '#e8755f', // coral
+   '#d4a24a', // amber
+   '#7ec87e', // sage
+   '#4ab8b8', // aqua
+   '#5fa8d4', // sky
+   '#8a7ee8', // lavender
+   '#d47ab8', // mauve
+   '#a0b87e', // olive
+]
