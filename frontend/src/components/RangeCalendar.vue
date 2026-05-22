@@ -131,6 +131,14 @@ const weekSegments = computed(() =>
    })
 )
 
+function contrastColor(hex) {
+   const r = parseInt(hex.slice(1, 3), 16)
+   const g = parseInt(hex.slice(3, 5), 16)
+   const b = parseInt(hex.slice(5, 7), 16)
+   const perceived = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+   return perceived > 0.60 ? '#000000' : '#ffffff'
+}
+
 // Inline style for each bar segment: grid placement + rounded caps + color
 function barStyle(seg) {
    const tl = seg.startsHere ? '6px' : '0'
@@ -140,6 +148,7 @@ function barStyle(seg) {
    return {
       gridColumn: `${seg.colStart} / span ${seg.colSpan}`,
       background: seg.color,
+      color: contrastColor(seg.color),
       borderRadius: `${tl} ${tr} ${br} ${bl}`,
       // small gap at the cap ends so the bar doesn't touch the cell edge
       marginLeft:  seg.startsHere ? '2px' : '0',
@@ -448,7 +457,6 @@ defineExpose({ clearSelection })
    overflow: hidden;
    text-overflow: ellipsis;
    padding: 0 5px;
-   color: rgba(0, 0, 0, 0.65);
 }
 
 /* ── Light mode ── */

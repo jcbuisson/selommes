@@ -1,3 +1,9 @@
 <template>
-   <router-view></router-view>
+   <router-view />
+
+   <VersionUpdater />
 </template>
+
+<script>
+import VersionUpdater from "/src/components/VersionUpdater.vue";
+</script>
