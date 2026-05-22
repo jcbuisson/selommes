@@ -148,6 +148,11 @@ function barStyle(seg) {
 }
 
 function onBarClick(seg) {
+   if (selectedRangeUid.value === seg.uid) {
+      clearSelection()
+      emit('range-selected', null)
+      return
+   }
    selectionStart.value = seg.rangeStart
    selectionEnd.value = seg.rangeEnd
    selectedRangeUid.value = seg.uid
@@ -225,14 +230,13 @@ function onMouseEnter(date) { moveDragTo(date) }
 function onDragEnd() {
    if (!isDragging.value) return
    isDragging.value = false
-   const moved = hasMoved.value
    hasMoved.value = false
    lastDragDate.value = null
    if (!activeRange.value.start) return
    if (!selectedRangeUid.value) {
       // 'update' for existing ranges is emitted during the drag via moveDragTo;
       // only new selections are finalised here.
-      if (moved) emit('new-range', { start: activeRange.value.start, end: activeRange.value.end })
+      emit('new-range', { start: activeRange.value.start, end: activeRange.value.end })
    }
 }
 
