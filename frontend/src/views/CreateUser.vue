@@ -1,6 +1,7 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useObservable } from '@vueuse/rxjs'
 
 import useUser from '/src/use/useUser'
 import { app } from '/src/client-app.ts'
@@ -11,13 +12,23 @@ const props = defineProps({
    color: { type: String, default: '' },
 })
 
-const { create: createUser } = useUser(app)
+const { create: createUser, getObservable: users$ } = useUser(app)
 
 const router = useRouter()
+
+const users = useObservable(users$({}))
+const usedColors = computed(() => new Set(users.value?.map(u => u.color) ?? []))
 
 const email = ref(props.email)
 const name = ref('')
 const color = ref(COLORS.includes(props.color) ? props.color : COLORS[0])
+
+// Once users load, move to the first available color if the current one is taken
+watch(usedColors, (used) => {
+   if (used.has(color.value)) {
+      color.value = COLORS.find(c => !used.has(c)) ?? color.value
+   }
+}, { once: true })
 
 async function onSubmit() {
    const user = await createUser({
@@ -71,8 +82,9 @@ async function onSubmit() {
                   :key="c"
                   type="button"
                   class="swatch"
-                  :class="{ selected: c === color }"
+                  :class="{ selected: c === color, taken: usedColors.has(c) }"
                   :style="{ background: c }"
+                  :disabled="usedColors.has(c)"
                   @click="color = c"
                />
             </div>
@@ -163,6 +175,12 @@ async function onSubmit() {
 .swatch.selected {
    border-color: #cdd6f4;
    transform: scale(1.15);
+}
+
+.swatch.taken {
+   opacity: 0.25;
+   cursor: not-allowed;
+   transform: none;
 }
 
 .submit-btn {
