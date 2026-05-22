@@ -30,7 +30,7 @@
     "dev": "node --watch --import tsx/esm src/app.js"
   },
   "dependencies": {
-    "@jcbuisson/express-x": "^3.1.3",
+    "@jcbuisson/express-x": "^3.1.4",
     "@jcbuisson/express-x-drizzle": "^1.0.9",
     "@prisma/adapter-pg": "^7.4.1",
     "@prisma/client": "^7.4.1",

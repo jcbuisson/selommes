@@ -49,8 +49,17 @@ function cancelCreate() {
 }
 
 function onSelectRange(uid) {
-   console.log('range-selected!')
-   selectedRangeUid.value = uid
+   if (!uid) {
+      selectedRangeUid.value = null
+      return
+   }
+   const range = ranges.value?.find(r => r.uid === uid)
+   if (range?.user_uid === localStorage.getItem('selommes_user_uid')) {
+      selectedRangeUid.value = uid
+   } else {
+      console.log('range clicked but belongs to another user:', uid)
+      calendarRef.value?.clearSelection()
+   }
 }
 
 async function onUpdateRange({ uid, start, end }) {
@@ -76,11 +85,11 @@ async function deleteSelectedRange() {
                <path :d="mdiDelete" fill="currentColor" />
             </svg>
          </button>
-         <button class="topbar-btn" title="Nouvelle plage" @click="onNewRange">
+         <!-- <button class="topbar-btn" title="Nouvelle plage" @click="onNewRange">
             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                <path :d="mdiCalendarPlus" fill="currentColor" />
             </svg>
-         </button>
+         </button> -->
       </header>
 
       <RangeCalendar ref="calendarRef" :ranges="ranges" @new-range="onNewRange" @update="onUpdateRange" @range-selected="onSelectRange" />
