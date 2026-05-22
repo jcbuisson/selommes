@@ -136,7 +136,7 @@ function contrastColor(hex) {
    const g = parseInt(hex.slice(3, 5), 16)
    const b = parseInt(hex.slice(5, 7), 16)
    const perceived = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-   return perceived > 0.60 ? '#000000' : '#ffffff'
+   return perceived > 0.70 ? '#000000' : '#ffffff'
 }
 
 // Inline style for each bar segment: grid placement + rounded caps + color
