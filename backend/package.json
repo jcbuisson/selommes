@@ -1,5 +1,5 @@
 {
-  "name": "",
+  "name": "selommes",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -30,17 +30,14 @@
     "dev": "node --watch --import tsx/esm src/app.js"
   },
   "dependencies": {
-    "@jcbuisson/express-x": "^3.1.4",
-    "@jcbuisson/express-x-drizzle": "^1.0.9",
-    "@prisma/adapter-pg": "^7.4.1",
-    "@prisma/client": "^7.4.1",
+    "@jcbuisson/express-x": "^3.1.6",
+    "@jcbuisson/express-x-drizzle": "^3.1.6",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "express": "^5.2.1",
     "express-x-drizzle": "^1.0.1",
     "express-x-prisma": "^1.0.1",
-    "pg": "^8.20.0",
-    "prisma": "^7.4.1"
+    "pg": "^8.20.0"
   },
   "devDependencies": {
     "@types/pg": "^8.20.0",
