@@ -4,6 +4,6 @@
    <VersionUpdater />
 </template>
 
-<script>
+<script setup>
 import VersionUpdater from "/src/components/VersionUpdater.vue";
 </script>
