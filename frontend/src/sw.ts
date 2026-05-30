@@ -6,7 +6,7 @@ import { CacheFirst } from 'workbox-strategies'
 import { CacheableResponsePlugin } from 'workbox-cacheable-response'
 import { ExpirationPlugin } from 'workbox-expiration'
 
-export const SW_VERSION = '1.1.21';
+export const SW_VERSION = '0.9.1';
 
 clientsClaim()
 
