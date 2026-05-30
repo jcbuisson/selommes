@@ -19,7 +19,6 @@ export default defineConfig({
          devOptions: {
             enabled: false
          },
-         mode: "development",
          base: "/",
          srcDir: "src",
          filename: "sw.ts",
