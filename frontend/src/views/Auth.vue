@@ -7,6 +7,7 @@ import { app } from '/src/client-app.ts';
 const router = useRouter()
 
 const email = ref('')
+const emailSent = ref(false)
 
 async function onSubmit() {
    const user = await app.service('user').findUnique({ email: email.value });
@@ -24,6 +25,7 @@ async function onSubmit() {
          html,
       })
 
+      emailSent.value = true
       // router.push({
       //    path: '/create-user',
       //    query: { email: email.value },
@@ -34,7 +36,8 @@ async function onSubmit() {
 
 <template>
    <div class="auth-wrapper">
-      <form class="auth-form" @submit.prevent="onSubmit">
+      <p v-if="emailSent" class="email-sent-msg">Veuillez consulter votre boite mail pour confirmer l'inscription</p>
+      <form v-else class="auth-form" @submit.prevent="onSubmit">
          <h1 class="auth-title">Créer un compte ou se connecter</h1>
          <div class="field">
             <label class="field-label" for="email">Adresse e-mail</label>
@@ -123,5 +126,16 @@ async function onSubmit() {
 
 .submit-btn:hover {
    background: #b4d0fb;
+}
+
+.email-sent-msg {
+   color: #cdd6f4;
+   font-size: 1rem;
+   text-align: center;
+   max-width: 360px;
+   padding: 1.5rem;
+   background: #1e1e2e;
+   border: 1px solid #313244;
+   border-radius: 12px;
 }
 </style>
