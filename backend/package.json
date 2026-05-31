@@ -37,6 +37,7 @@
     "express": "^5.2.1",
     "express-x-drizzle": "^1.0.1",
     "express-x-prisma": "^1.0.1",
+    "nodemailer": "^8.0.10",
     "pg": "^8.20.0"
   },
   "devDependencies": {

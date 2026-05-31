@@ -9,7 +9,6 @@ import COLORS from '/src/colors.mjs'
 
 const props = defineProps({
    email: { type: String, default: '' },
-   color: { type: String, default: '' },
 })
 
 const { create: createUser, getObservable: users$ } = useUser(app)
@@ -38,8 +37,8 @@ async function onSubmit() {
    })
    console.log('user', user);
    localStorage.setItem('selommes_user_uid', user.uid);
-   localStorage.setItem('selommes_color', user.color);
-   localStorage.setItem('selommes_name', user.name);
+   localStorage.setItem('selommes_user_color', user.color);
+   localStorage.setItem('selommes_user_name', user.name);
    router.push('/agenda');
 }
 </script>
@@ -56,9 +55,9 @@ async function onSubmit() {
                v-model="email"
                class="field-input"
                type="email"
-               placeholder="vous@exemple.fr"
                autocomplete="email"
                required
+               readonly
             />
          </div>
 

@@ -19,7 +19,9 @@ const routes = [
       meta: {
          requiresConnection: true
       },
-      props: route => ({ email: route.query.email }),
+      props: route => ({
+         email: route.query.email
+      }),
    },
    {
       path: '/not-connected',

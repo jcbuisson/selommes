@@ -12,14 +12,22 @@ async function onSubmit() {
    const user = await app.service('user').findUnique({ email: email.value });
    if (user) {
       localStorage.setItem('selommes_user_uid', user.uid);
-      localStorage.setItem('selommes_color', user.color);
-      localStorage.setItem('selommes_name', user.name);
+      localStorage.setItem('selommes_user_color', user.color);
+      localStorage.setItem('selommes_user_name', user.name);
       router.push('/agenda')
    } else {
-      router.push({
-         path: '/create-user',
-         query: { email: email.value },
+      const html = `<a href="${import.meta.env.VITE_SELOMMES_URL}/create-user?email=${encodeURIComponent(email.value)}" style="display:inline-block;padding:10px 20px;background-color:#89b4fa;color:#1e1e2e;text-decoration:none;border-radius:6px;font-weight:600;">Cliquez ici</a> pour confirmer votre inscription au calendrier de Selommes`;
+      await app.service('mail').send({
+         to: email.value,
+         subject: "Selommes, confirmation de l'email",
+         text: null,
+         html,
       })
+
+      // router.push({
+      //    path: '/create-user',
+      //    query: { email: email.value },
+      // })
    }
 }
 </script>

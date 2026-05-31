@@ -24,8 +24,8 @@ async function onNewRange({ start, end }) {
       // labelInput.value = ''
       // showModal.value = true
       await createRange({
-         label: localStorage.getItem('selommes_name'),
-         color: localStorage.getItem('selommes_color'),
+         label: localStorage.getItem('selommes_user_name'),
+         color: localStorage.getItem('selommes_user_color'),
          start, end,
          user_uid: localStorage.getItem('selommes_user_uid'),
       })
@@ -37,8 +37,8 @@ async function onNewRange({ start, end }) {
 async function confirmCreate() {
    showModal.value = false
    await createRange({
-      label: localStorage.getItem('selommes_name'),
-      color: localStorage.getItem('selommes_color'),
+      label: localStorage.getItem('selommes_user_name'),
+      color: localStorage.getItem('selommes_user_color'),
       start, end,
       user_uid: localStorage.getItem('selommes_user_uid'),
    })
@@ -79,7 +79,7 @@ async function deleteSelectedRange() {
 <template>
    <div class="app-wrapper">
       <header class="topbar">
-         <span class="topbar-title">Selommes 10</span>
+         <span class="topbar-title">Selommes</span>
          <button v-if="selectedRangeUid" class="topbar-btn topbar-btn--danger" title="Supprimer la plage" @click="deleteSelectedRange">
             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                <path :d="mdiDelete" fill="currentColor" />

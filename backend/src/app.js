@@ -6,6 +6,8 @@ import { eq } from 'drizzle-orm';
 import { expressX, reloadPlugin } from '@jcbuisson/express-x'
 import { drizzleOfflinePlugin } from '@jcbuisson/express-x-drizzle'
 
+import mailService from '#root/src/mail.service.js'
+
 // import authService from '#root/src/services/auth.service.js'
 import publish from './publish.js'
 import { metadata, user, range } from '#root/src/db/schema.js';
@@ -21,6 +23,7 @@ const db = drizzle(process.env.DATABASE_URL);
 app.configure(drizzleOfflinePlugin, db, metadata, [ user, range ])
 
 // app.configure(authService);
+app.configure(mailService)
 
 // preserve socket data & rooms membership on page reload
 app.configure(reloadPlugin)
@@ -33,7 +36,7 @@ app.on('connection', (socket) => {
 })
 
 // development only: serve static assets
-app.use('/static', express.static('./static'))
+// app.use('/static', express.static('./static'))
 
 const PORT = process.env.PORT || 3000
 app.httpServer.listen(PORT, () => console.log(`App listening at http://localhost:${PORT}`))
