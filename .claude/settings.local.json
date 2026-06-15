@@ -8,7 +8,9 @@
       "Bash(npm test *)",
       "Bash(npm run *)",
       "Bash(xargs cat -n)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(mv src/assets/selommes-icon.svg src/assets/selommes-icon-16.png src/assets/selommes-icon-32.png src/assets/selommes-icon-180.png src/assets/selommes-icon-192.png src/assets/selommes-icon-512.png public/)",
+      "Bash(rm public/vite.svg)"
     ]
   }
 }

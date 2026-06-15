@@ -79,7 +79,10 @@ async function deleteSelectedRange() {
 <template>
    <div class="app-wrapper">
       <header class="topbar">
-         <span class="topbar-title">Selommes</span>
+         <div class="topbar-heading">
+            <img class="topbar-icon" src="/selommes-icon.svg" alt="" />
+            <span class="topbar-title">Agenda</span>
+         </div>
          <button v-if="selectedRangeUid" class="topbar-btn topbar-btn--danger" title="Supprimer la plage" @click="deleteSelectedRange">
             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                <path :d="mdiDelete" fill="currentColor" />
@@ -136,11 +139,23 @@ async function deleteSelectedRange() {
    gap: 1rem;
 }
 
+.topbar-heading {
+   display: flex;
+   align-items: center;
+   gap: 0.6rem;
+   flex: 1;
+}
+
+.topbar-icon {
+   width: 30px;
+   height: 30px;
+   border-radius: 7px;
+}
+
 .topbar-title {
    font-size: 1.05rem;
    font-weight: 600;
    color: #cdd6f4;
-   flex: 1;
 }
 
 .topbar-btn {
