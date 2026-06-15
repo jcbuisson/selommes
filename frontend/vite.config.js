@@ -7,13 +7,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 export default defineConfig({
 
   plugins: [
-      vue({
-         template: {
-            compilerOptions: {
-               isCustomElement: tag => tag.startsWith('jcb-')
-            },
-         }
-      }),
+      vue(),
    
       VitePWA({
          devOptions: {
