@@ -6,42 +6,83 @@ import { mdiCalendarPlus, mdiDelete } from '@mdi/js'
 import RangeCalendar from '/src/components/RangeCalendar.vue'
 
 import useRange from '/src/use/useRange';
+import useUser from '/src/use/useUser';
 
 import { app } from '/src/client-app.ts';
 
 const { getObservable: ranges$, create: createRange, update: updateRange, remove: removeRange } = useRange(app);
+const { findByUID: findUserByUID } = useUser(app);
 
 const ranges = useObservable(ranges$({}))
 
 const showModal = ref(false)
 const labelInput = ref('')
+const pendingRange = ref(null)
 const selectedRangeUid = ref(null)
 const calendarRef = ref(null)
+
+async function getCurrentUser() {
+   const uid = localStorage.getItem('selommes_user_uid')
+   if (!uid) throw new Error('Utilisateur non connecté')
+
+   let user = null
+   if (app.isConnected) {
+      user = await app.service('user').findUnique({ uid })
+      if (!user) {
+         throw new Error("Le compte utilisateur n'est pas encore synchronisé")
+      }
+   } else {
+      user = await findUserByUID(uid)
+      if (!user) {
+         const name = localStorage.getItem('selommes_user_name')
+         const color = localStorage.getItem('selommes_user_color')
+         if (name && color) user = { uid, name, color }
+      }
+   }
+
+   if (!user?.name || !user?.color) {
+      throw new Error('Le profil utilisateur est incomplet')
+   }
+
+   localStorage.setItem('selommes_user_name', user.name)
+   localStorage.setItem('selommes_user_color', user.color)
+   return user
+}
+
+function serializeDate(value) {
+   const date = value instanceof Date ? value : new Date(value)
+   if (Number.isNaN(date.getTime())) throw new Error('Date de plage invalide')
+   return date.toISOString()
+}
+
+async function createCurrentUserRange(start, end) {
+   const user = await getCurrentUser()
+   return createRange({
+      label: user.name,
+      color: user.color,
+      start: serializeDate(start),
+      end: serializeDate(end),
+      user_uid: user.uid,
+   })
+}
 
 async function onNewRange({ start, end }) {
    console.log('select!')
    try {
       // labelInput.value = ''
       // showModal.value = true
-      await createRange({
-         label: localStorage.getItem('selommes_user_name'),
-         color: localStorage.getItem('selommes_user_color'),
-         start, end,
-         user_uid: localStorage.getItem('selommes_user_uid'),
-      })
+      await createCurrentUserRange(start, end)
    } finally {
       calendarRef.value?.clearSelection()
    }
 }
 
 async function confirmCreate() {
+   if (!pendingRange.value) return
+   const { start, end } = pendingRange.value
    showModal.value = false
-   await createRange({
-      label: localStorage.getItem('selommes_user_name'),
-      color: localStorage.getItem('selommes_user_color'),
-      start, end,
-      user_uid: localStorage.getItem('selommes_user_uid'),
-   })
+   pendingRange.value = null
+   await createCurrentUserRange(start, end)
 }
 
 function cancelCreate() {
