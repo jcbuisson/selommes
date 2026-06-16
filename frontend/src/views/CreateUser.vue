@@ -4,13 +4,14 @@ import { useRouter } from 'vue-router'
 import { useObservable } from '@vueuse/rxjs'
 
 import useUser from '/src/use/useUser'
-import { app } from '/src/client-app.ts'
+import useExpressXClient from '/src/use/useExpressXClient.ts'
 import COLORS from '/src/colors.mjs'
 
 const props = defineProps({
    email: { type: String, default: '' },
 })
 
+const { app } = useExpressXClient()
 const { create: createUser, getObservable: users$ } = useUser(app)
 
 const router = useRouter()

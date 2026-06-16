@@ -2,9 +2,10 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { app } from '/src/client-app.ts';
+import useExpressXClient from '/src/use/useExpressXClient.ts';
 
 const router = useRouter()
+const { app } = useExpressXClient()
 
 const email = ref('')
 const emailSent = ref(false)

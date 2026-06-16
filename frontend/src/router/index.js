@@ -2,8 +2,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 import Agenda from '/src/views/Agenda.vue'
-import { app } from '/src/client-app.ts'
+import useExpressXClient from '/src/use/useExpressXClient.ts'
 
+const { app } = useExpressXClient()
 
 const routes = [
    {

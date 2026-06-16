@@ -8,8 +8,9 @@ import RangeCalendar from '/src/components/RangeCalendar.vue'
 import useRange from '/src/use/useRange';
 import useUser from '/src/use/useUser';
 
-import { app } from '/src/client-app.ts';
+import useExpressXClient from '/src/use/useExpressXClient.ts';
 
+const { app } = useExpressXClient()
 const { getObservable: ranges$, create: createRange, update: updateRange, remove: removeRange } = useRange(app);
 const { findByUID: findUserByUID } = useUser(app);
 
