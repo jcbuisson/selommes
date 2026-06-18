@@ -24,6 +24,10 @@ const props = defineProps({
       type: Array,
       default: () => [],
    },
+   currentUserUid: {
+      type: String,
+      default: null,
+   },
 })
 
 const emit = defineEmits([
@@ -171,6 +175,23 @@ function onBarClick(seg) {
    lastDragDate.value = null
 }
 
+function selectRange(range) {
+   selectionStart.value = range.start
+   selectionEnd.value = range.end
+   selectedRangeUid.value = range.uid
+   emit('range-selected', range.uid)
+}
+
+function ownedRangeAt(date) {
+   if (!props.currentUserUid) return null
+   const t = date.getTime()
+   return normalizedRanges.value.find(range =>
+      range.user_uid === props.currentUserUid &&
+      t >= range.start.getTime() &&
+      t <= range.end.getTime()
+   )
+}
+
 function dayClasses(date) {
    const { start, end } = activeRange.value
    if (!start) return {}
@@ -199,11 +220,22 @@ function nextMonth() {
 // Otherwise start a fresh selection anchored at the clicked date.
 
 function startDrag(date) {
+   const { start, end } = activeRange.value
+   const isHandle = (start && date.getTime() === start.getTime()) || (end && date.getTime() === end.getTime())
+   const ownedRange = !isHandle ? ownedRangeAt(date) : null
+
+   if (ownedRange) {
+      selectRange(ownedRange)
+      isDragging.value = false
+      hasMoved.value = false
+      lastDragDate.value = null
+      dragAnchor.value = null
+      return
+   }
+
    isDragging.value = true
    hasMoved.value = false
    lastDragDate.value = null
-   const { start, end } = activeRange.value
-   const isHandle = (start && date.getTime() === start.getTime()) || (end && date.getTime() === end.getTime())
    if (!isHandle) {
       selectedRangeUid.value = null
    }

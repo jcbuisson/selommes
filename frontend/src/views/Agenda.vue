@@ -21,6 +21,7 @@ const labelInput = ref('')
 const pendingRange = ref(null)
 const selectedRangeUid = ref(null)
 const calendarRef = ref(null)
+const currentUserUid = localStorage.getItem('selommes_user_uid')
 
 async function getCurrentUser() {
    const uid = localStorage.getItem('selommes_user_uid')
@@ -137,7 +138,14 @@ async function deleteSelectedRange() {
          </button> -->
       </header>
 
-      <RangeCalendar ref="calendarRef" :ranges="ranges" @new-range="onNewRange" @update="onUpdateRange" @range-selected="onSelectRange" />
+      <RangeCalendar
+         ref="calendarRef"
+         :ranges="ranges"
+         :current-user-uid="currentUserUid"
+         @new-range="onNewRange"
+         @update="onUpdateRange"
+         @range-selected="onSelectRange"
+      />
 
       <div v-if="showModal" class="modal-backdrop" @click.self="cancelCreate">
          <div class="modal">
