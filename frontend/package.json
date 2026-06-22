@@ -7,13 +7,14 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "range-client": "node scripts/range-client.mjs"
+    "range-client": "node scripts/range-client.js"
   },
   "dependencies": {
     "@jcbuisson/express-x-client": "^3.1.33",
     "@mdi/js": "^7.4.47",
     "@vueuse/core": "^14.2.1",
     "@vueuse/rxjs": "^14.2.1",
+    "commander": "^15.0.0",
     "dexie": "^4.3.0",
     "rxjs": "^7.8.2",
     "socket.io-client": "^4.8.3",
