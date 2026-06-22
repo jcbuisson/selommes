@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useObservable } from '@vueuse/rxjs'
-import { mdiCalendarPlus, mdiDelete } from '@mdi/js'
+import { mdiCalendarPlus } from '@mdi/js'
 
 import RangeCalendar from '/src/components/RangeCalendar.vue'
 
@@ -204,12 +204,6 @@ async function onUpdateRange({ uid, start, end }) {
    // calendarRef.value?.clearSelection()
 }
 
-async function deleteSelectedRange() {
-   if (!selectedRangeUid.value) return
-   await removeRange(selectedRangeUid.value)
-   selectedRangeUid.value = null
-   calendarRef.value?.clearSelection()
-}
 </script>
 
 <template>
@@ -219,11 +213,6 @@ async function deleteSelectedRange() {
             <img class="topbar-icon" src="/selommes-icon.svg" alt="" />
             <span class="topbar-title">Selommes</span>
          </div>
-         <button v-if="selectedRangeUid" class="topbar-btn topbar-btn--danger" title="Supprimer la plage" @click="deleteSelectedRange">
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-               <path :d="mdiDelete" fill="currentColor" />
-            </svg>
-         </button>
          <button class="topbar-btn" title="Nouvelle plage" @click="openCreateDialog">
             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                <path :d="mdiCalendarPlus" fill="currentColor" />
@@ -347,11 +336,6 @@ async function deleteSelectedRange() {
 .topbar-btn:hover {
    background: #45475a;
    border-color: #89b4fa;
-}
-
-.topbar-btn--danger:hover {
-   border-color: #f38ba8;
-   color: #f38ba8;
 }
 
 .topbar-btn svg {
