@@ -17,11 +17,19 @@ const { findByUID: findUserByUID } = useUser(app);
 const ranges = useObservable(ranges$({}))
 
 const showModal = ref(false)
-const labelInput = ref('')
-const pendingRange = ref(null)
+const startDateInput = ref('')
+const endDateInput = ref('')
+const rangeFormError = ref('')
 const selectedRangeUid = ref(null)
 const calendarRef = ref(null)
 const currentUserUid = localStorage.getItem('selommes_user_uid')
+
+function formatDateInput(date) {
+   const year = date.getFullYear()
+   const month = String(date.getMonth() + 1).padStart(2, '0')
+   const day = String(date.getDate()).padStart(2, '0')
+   return `${year}-${month}-${day}`
+}
 
 async function getCurrentUser() {
    const uid = localStorage.getItem('selommes_user_uid')
@@ -57,6 +65,15 @@ function serializeDate(value) {
    return date.toISOString()
 }
 
+function parseDateInput(value) {
+   const [year, month, day] = value.split('-').map(Number)
+   const date = new Date(year, month - 1, day)
+   if (!year || !month || !day || Number.isNaN(date.getTime())) {
+      throw new Error('Date de plage invalide')
+   }
+   return date
+}
+
 async function createCurrentUserRange(start, end) {
    const user = await getCurrentUser()
    return createRange({
@@ -71,24 +88,41 @@ async function createCurrentUserRange(start, end) {
 async function onNewRange({ start, end }) {
    console.log('select!')
    try {
-      // labelInput.value = ''
-      // showModal.value = true
       await createCurrentUserRange(start, end)
    } finally {
       calendarRef.value?.clearSelection()
    }
 }
 
+function openCreateDialog() {
+   const today = new Date()
+   const defaultDate = formatDateInput(today)
+   startDateInput.value = defaultDate
+   endDateInput.value = defaultDate
+   rangeFormError.value = ''
+   showModal.value = true
+}
+
 async function confirmCreate() {
-   if (!pendingRange.value) return
-   const { start, end } = pendingRange.value
-   showModal.value = false
-   pendingRange.value = null
-   await createCurrentUserRange(start, end)
+   rangeFormError.value = ''
+   try {
+      const start = parseDateInput(startDateInput.value)
+      const end = parseDateInput(endDateInput.value)
+      if (end.getTime() < start.getTime()) {
+         rangeFormError.value = 'La date de fin doit etre apres la date de debut'
+         return
+      }
+
+      showModal.value = false
+      await createCurrentUserRange(start, end)
+   } catch (error) {
+      rangeFormError.value = error.message || 'Impossible de creer la plage'
+   }
 }
 
 function cancelCreate() {
    showModal.value = false
+   rangeFormError.value = ''
 }
 
 function onSelectRange(uid) {
@@ -131,11 +165,11 @@ async function deleteSelectedRange() {
                <path :d="mdiDelete" fill="currentColor" />
             </svg>
          </button>
-         <!-- <button class="topbar-btn" title="Nouvelle plage" @click="onNewRange">
+         <button class="topbar-btn" title="Nouvelle plage" @click="openCreateDialog">
             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                <path :d="mdiCalendarPlus" fill="currentColor" />
             </svg>
-         </button> -->
+         </button>
       </header>
 
       <RangeCalendar
@@ -149,18 +183,32 @@ async function deleteSelectedRange() {
 
       <div v-if="showModal" class="modal-backdrop" @click.self="cancelCreate">
          <div class="modal">
-            <p class="modal-title">Texte à afficher</p>
-            <input
-               v-model="labelInput"
-               class="modal-input"
-               placeholder="ex: Vacances"
-               autofocus
-               @keydown.enter="confirmCreate"
-               @keydown.esc="cancelCreate"
-            />
+            <p class="modal-title">Nouvelle plage</p>
+            <label class="modal-field">
+               <span>Debut</span>
+               <input
+                  v-model="startDateInput"
+                  class="modal-input"
+                  type="date"
+                  autofocus
+                  @keydown.enter="confirmCreate"
+                  @keydown.esc="cancelCreate"
+               />
+            </label>
+            <label class="modal-field">
+               <span>Fin</span>
+               <input
+                  v-model="endDateInput"
+                  class="modal-input"
+                  type="date"
+                  @keydown.enter="confirmCreate"
+                  @keydown.esc="cancelCreate"
+               />
+            </label>
+            <p v-if="rangeFormError" class="modal-error">{{ rangeFormError }}</p>
             <div class="modal-actions">
                <button class="modal-btn cancel" @click="cancelCreate">Annuler</button>
-               <button class="modal-btn confirm" :disabled="!labelInput.trim()" @click="confirmCreate">Créer</button>
+               <button class="modal-btn confirm" :disabled="!startDateInput || !endDateInput" @click="confirmCreate">Créer</button>
             </div>
          </div>
       </div>
@@ -266,6 +314,15 @@ async function deleteSelectedRange() {
    color: #cdd6f4;
 }
 
+.modal-field {
+   display: flex;
+   flex-direction: column;
+   gap: 0.35rem;
+   color: #bac2de;
+   font-size: 0.85rem;
+   font-weight: 600;
+}
+
 .modal-input {
    background: #313244;
    border: 1px solid #45475a;
@@ -279,6 +336,12 @@ async function deleteSelectedRange() {
 
 .modal-input:focus {
    border-color: #89b4fa;
+}
+
+.modal-error {
+   margin: 0;
+   color: #f38ba8;
+   font-size: 0.85rem;
 }
 
 .modal-actions {
