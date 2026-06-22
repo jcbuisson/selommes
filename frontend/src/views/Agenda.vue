@@ -20,6 +20,8 @@ const showModal = ref(false)
 const startDateInput = ref('')
 const endDateInput = ref('')
 const rangeFormError = ref('')
+const rangeDialogMode = ref('create')
+const editingRangeUid = ref(null)
 const selectedRangeUid = ref(null)
 const calendarRef = ref(null)
 const currentUserUid = localStorage.getItem('selommes_user_uid')
@@ -74,6 +76,13 @@ function parseDateInput(value) {
    return date
 }
 
+function resetRangeDialog() {
+   showModal.value = false
+   rangeDialogMode.value = 'create'
+   editingRangeUid.value = null
+   rangeFormError.value = ''
+}
+
 async function createCurrentUserRange(start, end) {
    const user = await getCurrentUser()
    return createRange({
@@ -99,6 +108,8 @@ function openCreateDialog() {
    const defaultDate = formatDateInput(today)
    startDateInput.value = defaultDate
    endDateInput.value = defaultDate
+   rangeDialogMode.value = 'create'
+   editingRangeUid.value = null
    rangeFormError.value = ''
    showModal.value = true
 }
@@ -114,25 +125,45 @@ async function confirmCreate() {
       }
 
       showModal.value = false
-      await createCurrentUserRange(start, end)
+      if (rangeDialogMode.value === 'edit' && editingRangeUid.value) {
+         const uid = editingRangeUid.value
+         editingRangeUid.value = null
+         rangeDialogMode.value = 'create'
+         await updateRange(uid, {
+            start: serializeDate(start),
+            end: serializeDate(end),
+         })
+      } else {
+         await createCurrentUserRange(start, end)
+      }
    } catch (error) {
       rangeFormError.value = error.message || 'Impossible de creer la plage'
    }
 }
 
 function cancelCreate() {
-   showModal.value = false
+   resetRangeDialog()
+}
+
+function openEditDialog(range) {
+   rangeDialogMode.value = 'edit'
+   editingRangeUid.value = range.uid
+   startDateInput.value = formatDateInput(new Date(range.start))
+   endDateInput.value = formatDateInput(new Date(range.end))
    rangeFormError.value = ''
+   showModal.value = true
 }
 
 function onSelectRange(uid) {
    if (!uid) {
       selectedRangeUid.value = null
+      if (editingRangeUid.value) resetRangeDialog()
       return
    }
    const range = ranges.value?.find(r => r.uid === uid)
-   if (range?.user_uid === localStorage.getItem('selommes_user_uid')) {
+   if (range?.user_uid === currentUserUid) {
       selectedRangeUid.value = uid
+      openEditDialog(range)
    } else {
       console.log('range clicked but belongs to another user:', uid)
       calendarRef.value?.clearSelection()
@@ -183,7 +214,7 @@ async function deleteSelectedRange() {
 
       <div v-if="showModal" class="modal-backdrop" @click.self="cancelCreate">
          <div class="modal">
-            <p class="modal-title">Nouvelle plage</p>
+            <p class="modal-title">{{ rangeDialogMode === 'edit' ? 'Modifier la plage' : 'Nouvelle plage' }}</p>
             <label class="modal-field">
                <span>Debut</span>
                <input
@@ -208,7 +239,9 @@ async function deleteSelectedRange() {
             <p v-if="rangeFormError" class="modal-error">{{ rangeFormError }}</p>
             <div class="modal-actions">
                <button class="modal-btn cancel" @click="cancelCreate">Annuler</button>
-               <button class="modal-btn confirm" :disabled="!startDateInput || !endDateInput" @click="confirmCreate">Créer</button>
+               <button class="modal-btn confirm" :disabled="!startDateInput || !endDateInput" @click="confirmCreate">
+                  {{ rangeDialogMode === 'edit' ? 'Enregistrer' : 'Créer' }}
+               </button>
             </div>
          </div>
       </div>

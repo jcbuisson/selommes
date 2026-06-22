@@ -166,18 +166,19 @@ function onBarClick(seg) {
       emit('range-selected', null)
       return
    }
-   selectionStart.value = seg.rangeStart
-   selectionEnd.value = seg.rangeEnd
+   selectionStart.value = null
+   selectionEnd.value = null
    selectedRangeUid.value = seg.uid
    emit('range-selected', seg.uid)
-   isDragging.value = true
+   isDragging.value = false
    hasMoved.value = false
    lastDragDate.value = null
+   dragAnchor.value = null
 }
 
 function selectRange(range) {
-   selectionStart.value = range.start
-   selectionEnd.value = range.end
+   selectionStart.value = null
+   selectionEnd.value = null
    selectedRangeUid.value = range.uid
    emit('range-selected', range.uid)
 }
