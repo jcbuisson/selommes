@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "range-client": "node scripts/range-client.js"
+    "range-client": "node scripts/range-client.js",
+    "user-client": "node scripts/user-client.js"
   },
   "dependencies": {
     "@jcbuisson/express-x-client": "^3.1.33",

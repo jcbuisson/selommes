@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// ex: npm run range-client -- get --uid 019eedea-7cc9-7334-8468-cf233c65695f 
 
 import { randomUUID } from 'node:crypto'
 import { io } from 'socket.io-client'
@@ -14,11 +15,17 @@ let timeout
 
 const program = new Command()
    .name('range-client')
-   .description('Create, edit, or delete ranges through the ExpressX client.')
+   .description('Get, create, edit, or delete ranges through the ExpressX client.')
    .option('--url <url>', 'Backend URL', DEFAULT_URL)
    .option('--path <path>', 'Socket.IO path', DEFAULT_PATH)
    .option('--timeout <ms>', 'Request timeout in milliseconds', parseTimeout, DEFAULT_TIMEOUT)
    .option('--verbose', 'Enable @jcbuisson/express-x-client debug logs')
+
+program
+   .command('get')
+   .description('Get an existing range')
+   .requiredOption('--uid <range-uid>', 'Range uid')
+   .action(options => runCommand(options, getRange))
 
 program
    .command('create')
@@ -109,6 +116,12 @@ async function createRange(options) {
    }
 
    return app.service('range', { timeout }).createWithMeta(uid, data, new Date().toISOString())
+}
+
+async function getRange(options) {
+   const range = await app.service('range', { timeout }).findUnique({ uid: options.uid })
+   if (!range) throw new Error(`Range not found: ${options.uid}`)
+   return range
 }
 
 async function editRange(options) {
