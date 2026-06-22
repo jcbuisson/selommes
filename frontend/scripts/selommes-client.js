@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// ex: npm run range-client -- get --uid 019eedea-7cc9-7334-8468-cf233c65695f 
 
 import { randomUUID } from 'node:crypto'
 import { io } from 'socket.io-client'
@@ -14,20 +13,70 @@ let app
 let timeout
 
 const program = new Command()
-   .name('range-client')
-   .description('Get, create, edit, or delete ranges through the ExpressX client.')
+   .name('selommes-client')
+   .description('List, get, create, edit, or delete Selommes users and ranges through the ExpressX client.')
    .option('--url <url>', 'Backend URL', DEFAULT_URL)
    .option('--path <path>', 'Socket.IO path', DEFAULT_PATH)
    .option('--timeout <ms>', 'Request timeout in milliseconds', parseTimeout, DEFAULT_TIMEOUT)
    .option('--verbose', 'Enable @jcbuisson/express-x-client debug logs')
 
-program
+const user = program
+   .command('user')
+   .description('Manage users')
+
+user
+   .command('list')
+   .description('List users')
+   .action(options => runCommand(options, listUsers, undefined, printUserList))
+
+user
+   .command('get')
+   .description('Get an existing user')
+   .requiredOption('--uid <user-uid>', 'User uid')
+   .action(options => runCommand(options, getUser))
+
+user
+   .command('create')
+   .description('Create a user')
+   .requiredOption('--email <email>', 'User email')
+   .requiredOption('--name <name>', 'User name')
+   .requiredOption('--color <color>', 'User color')
+   .option('--uid <uid>', 'User uid; defaults to a random UUID')
+   .action(options => runCommand(options, createUser, validateUserCreateOptions))
+
+user
+   .command('edit')
+   .alias('update')
+   .description('Edit an existing user')
+   .requiredOption('--uid <user-uid>', 'User uid')
+   .option('--email <email>', 'New user email')
+   .option('--name <name>', 'New user name')
+   .option('--color <color>', 'New user color')
+   .action(options => runCommand(options, editUser, validateUserEditOptions))
+
+user
+   .command('delete')
+   .alias('remove')
+   .description('Delete an existing user')
+   .requiredOption('--uid <user-uid>', 'User uid')
+   .action(options => runCommand(options, deleteUser))
+
+const range = program
+   .command('range')
+   .description('Manage ranges')
+
+range
+   .command('list')
+   .description('List ranges')
+   .action(options => runCommand(options, listRanges, undefined, printRangeList))
+
+range
    .command('get')
    .description('Get an existing range')
    .requiredOption('--uid <range-uid>', 'Range uid')
    .action(options => runCommand(options, getRange))
 
-program
+range
    .command('create')
    .description('Create a range')
    .requiredOption('--user-uid <uid>', 'Owner user uid')
@@ -36,9 +85,9 @@ program
    .option('--uid <uid>', 'Range uid; defaults to a random UUID')
    .option('--label <label>', 'Range label; defaults to the user name')
    .option('--color <hex>', 'Range color; defaults to the user color')
-   .action(options => runCommand(options, createRange, validateCreateOptions))
+   .action(options => runCommand(options, createRange, validateRangeCreateOptions))
 
-program
+range
    .command('edit')
    .alias('update')
    .description('Edit an existing range')
@@ -48,9 +97,9 @@ program
    .option('--end <date>', 'New range end date or ISO timestamp')
    .option('--label <label>', 'New range label')
    .option('--color <hex>', 'New range color')
-   .action(options => runCommand(options, editRange, validateEditOptions))
+   .action(options => runCommand(options, editRange, validateRangeEditOptions))
 
-program
+range
    .command('delete')
    .alias('remove')
    .description('Delete an existing range')
@@ -70,7 +119,7 @@ if (process.argv.length === 2) {
 
 await program.parseAsync()
 
-async function runCommand(options, handler, validateOptions) {
+async function runCommand(options, handler, validateOptions, print = printResult) {
    let socket
 
    try {
@@ -86,7 +135,7 @@ async function runCommand(options, handler, validateOptions) {
 
       app = createClient(socket, { debug: Boolean(globalOptions.verbose) })
       await waitForConnect(socket, timeout)
-      printResult(await handler(options))
+      print(await handler(options))
    } catch (error) {
       console.error(error?.message || error)
       process.exitCode = 1
@@ -95,15 +144,62 @@ async function runCommand(options, handler, validateOptions) {
    }
 }
 
+async function listUsers() {
+   return app.service('user', { timeout }).findMany({})
+}
+
+async function getUser(options) {
+   const user = await app.service('user', { timeout }).findUnique({ uid: options.uid })
+   if (!user) throw new Error(`User not found: ${options.uid}`)
+   return user
+}
+
+async function createUser(options) {
+   const uid = options.uid || randomUUID()
+   const data = {
+      email: options.email,
+      name: options.name,
+      color: options.color,
+   }
+
+   return app.service('user', { timeout }).createWithMeta(uid, data, new Date().toISOString())
+}
+
+async function editUser(options) {
+   const uid = options.uid
+   const existing = await app.service('user', { timeout }).findUnique({ uid })
+   if (!existing) throw new Error(`User not found: ${uid}`)
+
+   const data = {
+      email: options.email || existing.email,
+      name: options.name || existing.name,
+      color: options.color || existing.color,
+   }
+
+   return app.service('user', { timeout }).updateWithMeta(uid, data, new Date().toISOString())
+}
+
+async function deleteUser(options) {
+   return app.service('user', { timeout }).deleteWithMeta(options.uid, new Date().toISOString())
+}
+
+async function listRanges() {
+   return app.service('range', { timeout }).findMany({})
+}
+
+async function getRange(options) {
+   const range = await app.service('range', { timeout }).findUnique({ uid: options.uid })
+   if (!range) throw new Error(`Range not found: ${options.uid}`)
+   return range
+}
+
 async function createRange(options) {
    const start = parseDateOption(options.start, 'start')
    const end = parseDateOption(options.end, 'end')
    ensureChronologicalRange(start, end)
 
    const userUid = options.userUid
-
    const user = await app.service('user', { timeout }).findUnique({ uid: userUid })
-
    if (!user) throw new Error(`User not found: ${userUid}`)
 
    const uid = options.uid || randomUUID()
@@ -116,12 +212,6 @@ async function createRange(options) {
    }
 
    return app.service('range', { timeout }).createWithMeta(uid, data, new Date().toISOString())
-}
-
-async function getRange(options) {
-   const range = await app.service('range', { timeout }).findUnique({ uid: options.uid })
-   if (!range) throw new Error(`Range not found: ${options.uid}`)
-   return range
 }
 
 async function editRange(options) {
@@ -150,13 +240,28 @@ async function deleteRange(options) {
    return app.service('range', { timeout }).deleteWithMeta(options.uid, new Date().toISOString())
 }
 
-function validateCreateOptions(options) {
+function validateUserCreateOptions(options) {
+   validateRequiredValue(options.email, 'email')
+   validateRequiredValue(options.name, 'name')
+   validateRequiredValue(options.color, 'color')
+}
+
+function validateUserEditOptions(options) {
+   if (!hasAnyOption(options, ['email', 'name', 'color'])) {
+      throw new Error('Missing update data: provide at least one of --email, --name, or --color')
+   }
+   for (const name of ['email', 'name', 'color']) {
+      if (options[name] !== undefined) validateRequiredValue(options[name], name)
+   }
+}
+
+function validateRangeCreateOptions(options) {
    const start = parseDateOption(options.start, 'start')
    const end = parseDateOption(options.end, 'end')
    ensureChronologicalRange(start, end)
 }
 
-function validateEditOptions(options) {
+function validateRangeEditOptions(options) {
    if (!hasAnyOption(options, ['userUid', 'start', 'end', 'label', 'color'])) {
       throw new Error('Missing update data: provide at least one of --user-uid, --start, --end, --label, or --color')
    }
@@ -201,6 +306,12 @@ function hasAnyOption(options, names) {
    return names.some(name => options[name] !== undefined)
 }
 
+function validateRequiredValue(value, name) {
+   if (!String(value || '').trim()) {
+      throw new Error(`--${name} cannot be empty`)
+   }
+}
+
 function ensureChronologicalRange(start, end) {
    if (new Date(end).getTime() < new Date(start).getTime()) {
       throw new Error('--end must be greater than or equal to --start')
@@ -222,6 +333,18 @@ function parseDateOption(value, name) {
 
 function printResult(result) {
    console.log(JSON.stringify(result, null, 2))
+}
+
+function printUserList(users) {
+   for (const user of users) {
+      console.log(`${user.uid} ${user.name}`)
+   }
+}
+
+function printRangeList(ranges) {
+   for (const range of ranges) {
+      console.log(`${range.uid} ${range.user_uid} ${range.label}`)
+   }
 }
 
 function parseTimeout(value) {

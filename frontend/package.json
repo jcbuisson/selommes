@@ -1,14 +1,19 @@
 {
-  "name": "selommes",
-  "private": true,
-  "version": "0.0.0",
+  "name": "@jcbuisson/selommes-client",
+  "version": "1.0.0",
   "type": "module",
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "bin": {
+    "selommes-client": "./scripts/selommes-client.js"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "range-client": "node scripts/range-client.js",
-    "user-client": "node scripts/user-client.js"
+    "selommes-client": "node scripts/selommes-client.js"
   },
   "dependencies": {
     "@jcbuisson/express-x-client": "^3.1.33",
