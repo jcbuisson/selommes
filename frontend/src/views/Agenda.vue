@@ -17,6 +17,7 @@ const { findByUID: findUserByUID } = useUser(app);
 const ranges = useObservable(ranges$({}))
 
 const showModal = ref(false)
+const labelInput = ref('')
 const startDateInput = ref('')
 const endDateInput = ref('')
 const rangeFormError = ref('')
@@ -86,11 +87,24 @@ function resetRangeDialog() {
 async function createCurrentUserRange(start, end) {
    const user = await getCurrentUser()
    return createRange({
-      label: user.name,
+      label: labelInput.value.trim(),
       color: user.color,
       start: serializeDate(start),
       end: serializeDate(end),
       user_uid: user.uid,
+   })
+}
+
+async function updateRangeDates(uid, start, end) {
+   const range = ranges.value?.find(r => r.uid === uid)
+   if (!range) throw new Error('Plage introuvable')
+
+   return updateRange(uid, {
+      user_uid: range.user_uid,
+      label: labelInput.value.trim(),
+      color: range.color,
+      start: serializeDate(start),
+      end: serializeDate(end),
    })
 }
 
@@ -103,9 +117,11 @@ async function onNewRange({ start, end }) {
    }
 }
 
-function openCreateDialog() {
+async function openCreateDialog() {
    const today = new Date()
    const defaultDate = formatDateInput(today)
+   const user = await getCurrentUser()
+   labelInput.value = user.name
    startDateInput.value = defaultDate
    endDateInput.value = defaultDate
    rangeDialogMode.value = 'create'
@@ -117,6 +133,11 @@ function openCreateDialog() {
 async function confirmCreate() {
    rangeFormError.value = ''
    try {
+      const label = labelInput.value.trim()
+      if (!label) {
+         rangeFormError.value = 'Le libelle est obligatoire'
+         return
+      }
       const start = parseDateInput(startDateInput.value)
       const end = parseDateInput(endDateInput.value)
       if (end.getTime() < start.getTime()) {
@@ -129,10 +150,7 @@ async function confirmCreate() {
          const uid = editingRangeUid.value
          editingRangeUid.value = null
          rangeDialogMode.value = 'create'
-         await updateRange(uid, {
-            start: serializeDate(start),
-            end: serializeDate(end),
-         })
+         await updateRangeDates(uid, start, end)
       } else {
          await createCurrentUserRange(start, end)
       }
@@ -148,10 +166,20 @@ function cancelCreate() {
 function openEditDialog(range) {
    rangeDialogMode.value = 'edit'
    editingRangeUid.value = range.uid
+   labelInput.value = range.label
    startDateInput.value = formatDateInput(new Date(range.start))
    endDateInput.value = formatDateInput(new Date(range.end))
    rangeFormError.value = ''
    showModal.value = true
+}
+
+async function deleteEditingRange() {
+   if (rangeDialogMode.value !== 'edit' || !editingRangeUid.value) return
+   const uid = editingRangeUid.value
+   resetRangeDialog()
+   await removeRange(uid)
+   selectedRangeUid.value = null
+   calendarRef.value?.clearSelection()
 }
 
 function onSelectRange(uid) {
@@ -172,7 +200,7 @@ function onSelectRange(uid) {
 
 async function onUpdateRange({ uid, start, end }) {
    console.log('update!')
-   await updateRange(uid, { start, end })
+   await updateRangeDates(uid, start, end)
    // calendarRef.value?.clearSelection()
 }
 
@@ -216,12 +244,23 @@ async function deleteSelectedRange() {
          <div class="modal">
             <p class="modal-title">{{ rangeDialogMode === 'edit' ? 'Modifier la plage' : 'Nouvelle plage' }}</p>
             <label class="modal-field">
+               <span>Libelle</span>
+               <input
+                  v-model="labelInput"
+                  class="modal-input"
+                  type="text"
+                  autocomplete="off"
+                  autofocus
+                  @keydown.enter="confirmCreate"
+                  @keydown.esc="cancelCreate"
+               />
+            </label>
+            <label class="modal-field">
                <span>Debut</span>
                <input
                   v-model="startDateInput"
                   class="modal-input"
                   type="date"
-                  autofocus
                   @keydown.enter="confirmCreate"
                   @keydown.esc="cancelCreate"
                />
@@ -238,8 +277,9 @@ async function deleteSelectedRange() {
             </label>
             <p v-if="rangeFormError" class="modal-error">{{ rangeFormError }}</p>
             <div class="modal-actions">
+               <button v-if="rangeDialogMode === 'edit'" class="modal-btn danger" @click="deleteEditingRange">Supprimer</button>
                <button class="modal-btn cancel" @click="cancelCreate">Annuler</button>
-               <button class="modal-btn confirm" :disabled="!startDateInput || !endDateInput" @click="confirmCreate">
+               <button class="modal-btn confirm" :disabled="!labelInput.trim() || !startDateInput || !endDateInput" @click="confirmCreate">
                   {{ rangeDialogMode === 'edit' ? 'Enregistrer' : 'Créer' }}
                </button>
             </div>
@@ -383,6 +423,10 @@ async function deleteSelectedRange() {
    gap: 0.5rem;
 }
 
+.modal-actions .danger {
+   margin-right: auto;
+}
+
 .modal-btn {
    padding: 0.4rem 1rem;
    border-radius: 8px;
@@ -399,6 +443,17 @@ async function deleteSelectedRange() {
 
 .modal-btn.cancel:hover {
    background: #45475a;
+}
+
+.modal-btn.danger {
+   background: #313244;
+   border-color: #45475a;
+   color: #f38ba8;
+}
+
+.modal-btn.danger:hover {
+   background: #45475a;
+   border-color: #f38ba8;
 }
 
 .modal-btn.confirm {

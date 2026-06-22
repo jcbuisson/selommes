@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "range-client": "node scripts/range-client.mjs"
   },
   "dependencies": {
-    "@jcbuisson/express-x-client": "^3.1.32",
+    "@jcbuisson/express-x-client": "^3.1.33",
     "@mdi/js": "^7.4.47",
     "@vueuse/core": "^14.2.1",
     "@vueuse/rxjs": "^14.2.1",

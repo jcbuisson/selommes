@@ -42,11 +42,7 @@ const currentMonth = ref(today.getMonth())
 
 const selectionStart = ref(null)
 const selectionEnd = ref(null)
-const isDragging = ref(false)
-const hasMoved = ref(false) // true once the pointer moves during a drag
-const dragAnchor = ref(null) // the end that stays fixed during a drag
 const selectedRangeUid = ref(null) // uid of the range being edited, null for a fresh selection
-const lastDragDate = ref(null) // last date reached during drag, to suppress duplicate emits
 
 const monthLabel = computed(() =>
    `${MONTH_NAMES[currentMonth.value]} ${currentYear.value}`
@@ -170,27 +166,6 @@ function onBarClick(seg) {
    selectionEnd.value = null
    selectedRangeUid.value = seg.uid
    emit('range-selected', seg.uid)
-   isDragging.value = false
-   hasMoved.value = false
-   lastDragDate.value = null
-   dragAnchor.value = null
-}
-
-function selectRange(range) {
-   selectionStart.value = null
-   selectionEnd.value = null
-   selectedRangeUid.value = range.uid
-   emit('range-selected', range.uid)
-}
-
-function ownedRangeAt(date) {
-   if (!props.currentUserUid) return null
-   const t = date.getTime()
-   return normalizedRanges.value.find(range =>
-      range.user_uid === props.currentUserUid &&
-      t >= range.start.getTime() &&
-      t <= range.end.getTime()
-   )
 }
 
 function dayClasses(date) {
@@ -215,85 +190,6 @@ function nextMonth() {
    else currentMonth.value++
 }
 
-// ── Drag helpers ───────────────────────────────────────────────────────────
-// If the grabbed date is a handle of the current selection, pin the opposite
-// end as the anchor so the user edits just that one side.
-// Otherwise start a fresh selection anchored at the clicked date.
-
-function startDrag(date) {
-   const { start, end } = activeRange.value
-   const isHandle = (start && date.getTime() === start.getTime()) || (end && date.getTime() === end.getTime())
-   const ownedRange = !isHandle ? ownedRangeAt(date) : null
-
-   if (ownedRange) {
-      selectRange(ownedRange)
-      isDragging.value = false
-      hasMoved.value = false
-      lastDragDate.value = null
-      dragAnchor.value = null
-      return
-   }
-
-   isDragging.value = true
-   hasMoved.value = false
-   lastDragDate.value = null
-   if (!isHandle) {
-      selectedRangeUid.value = null
-   }
-   dragAnchor.value =
-      start && date.getTime() === start.getTime() ? end :
-      end   && date.getTime() === end.getTime()   ? start :
-      date
-   selectionStart.value = dragAnchor.value
-   selectionEnd.value = date
-}
-
-// ── Drag-move helper ───────────────────────────────────────────────────────
-// Called on every mouse-enter or touch-move during a drag.
-// Emits 'update' each time the pointer reaches a new date (for existing ranges).
-
-function moveDragTo(date) {
-   if (!isDragging.value) return
-   if (lastDragDate.value && date.getTime() === lastDragDate.value.getTime()) return
-   selectionEnd.value = date
-   hasMoved.value = true
-   lastDragDate.value = date
-   if (selectedRangeUid.value) {
-      emit('update', { uid: selectedRangeUid.value, start: activeRange.value.start, end: activeRange.value.end })
-   }
-}
-
-// ── Mouse ──────────────────────────────────────────────────────────────────
-
-function onMouseDown(date) { startDrag(date) }
-
-function onMouseEnter(date) { moveDragTo(date) }
-
-function onDragEnd() {
-   if (!isDragging.value) return
-   isDragging.value = false
-   hasMoved.value = false
-   lastDragDate.value = null
-   if (!activeRange.value.start) return
-   if (!selectedRangeUid.value) {
-      // 'update' for existing ranges is emitted during the drag via moveDragTo;
-      // only new selections are finalised here.
-      emit('new-range', { start: activeRange.value.start, end: activeRange.value.end })
-   }
-}
-
-// ── Touch ──────────────────────────────────────────────────────────────────
-
-function onTouchStart(date) { startDrag(date) }
-
-function onTouchMove(event) {
-   if (!isDragging.value) return
-   const touch = event.touches[0]
-   const el = document.elementFromPoint(touch.clientX, touch.clientY)
-   const cell = el?.closest('[data-date]')
-   if (cell?.dataset.date) moveDragTo(new Date(cell.dataset.date))
-}
-
 function formatDate(date) {
    return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 }
@@ -308,7 +204,7 @@ defineExpose({ clearSelection })
 </script>
 
 <template>
-   <div class="calendar" @mouseup="onDragEnd" @mouseleave="onDragEnd" @touchend="onDragEnd">
+   <div class="calendar">
 
       <!-- header -->
       <div class="calendar-header">
@@ -327,7 +223,6 @@ defineExpose({ clearSelection })
          v-for="(week, wi) in weeks"
          :key="wi"
          class="week-block"
-         @touchmove.prevent="onTouchMove"
       >
          <div
             v-for="day in week"
@@ -335,9 +230,6 @@ defineExpose({ clearSelection })
             class="day-cell"
             :class="[dayClasses(day.date), { 'other-month': !day.inMonth }]"
             :data-date="day.date.toISOString()"
-            @mousedown.prevent="onMouseDown(day.date)"
-            @mouseenter="onMouseEnter(day.date)"
-            @touchstart.prevent="onTouchStart(day.date)"
          >
             {{ day.date.getDate() }}
          </div>
