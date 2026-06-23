@@ -1,11 +1,14 @@
 #!/usr/bin/env node
+// npx @jcbuisson/selommes-client user list
+// npx @jcbuisson/selommes-client range list
+// npx @jcbuisson/selommes-client range --help
 
 import { randomUUID } from 'node:crypto'
 import { io } from 'socket.io-client'
 import { Command, InvalidArgumentError } from 'commander'
 import { createClient } from '@jcbuisson/express-x-client'
 
-const DEFAULT_URL = process.env.SELOMMES_URL || 'http://localhost:3000'
+const DEFAULT_URL = process.env.SELOMMES_URL || 'https://selommes.jcbuisson.dev'
 const DEFAULT_PATH = process.env.SELOMMES_SOCKET_PATH || '/selommes-socket-io/'
 const DEFAULT_TIMEOUT = 20000
 
@@ -343,8 +346,14 @@ function printUserList(users) {
 
 function printRangeList(ranges) {
    for (const range of ranges) {
-      console.log(`${range.uid} ${range.user_uid} ${range.label}`)
+      console.log(`${range.uid} ${range.user_uid} ${formatDateOnly(range.start)} ${formatDateOnly(range.end)} ${range.label}`)
    }
+}
+
+function formatDateOnly(value) {
+   const date = new Date(value)
+   if (Number.isNaN(date.getTime())) return value
+   return date.toISOString().slice(0, 10)
 }
 
 function parseTimeout(value) {
