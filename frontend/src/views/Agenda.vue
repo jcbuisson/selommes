@@ -77,12 +77,6 @@ function parseDateInput(value) {
    return date
 }
 
-function openDatePicker(event) {
-   const input = event.currentTarget
-   input.focus()
-   input.showPicker?.()
-}
-
 function resetRangeDialog() {
    showModal.value = false
    rangeDialogMode.value = 'create'
@@ -272,8 +266,6 @@ async function onUpdateRange({ uid, start, end }) {
                      v-model="startDateInput"
                      class="modal-input"
                      type="date"
-                     @click="openDatePicker"
-                     @touchstart="openDatePicker"
                      @keydown.enter="confirmCreate"
                      @keydown.esc="cancelCreate"
                   />
@@ -284,8 +276,6 @@ async function onUpdateRange({ uid, start, end }) {
                      v-model="endDateInput"
                      class="modal-input"
                      type="date"
-                     @click="openDatePicker"
-                     @touchstart="openDatePicker"
                      @keydown.enter="confirmCreate"
                      @keydown.esc="cancelCreate"
                   />
@@ -377,7 +367,10 @@ async function onUpdateRange({ uid, start, end }) {
    display: flex;
    align-items: center;
    justify-content: center;
+   padding: 1rem;
    z-index: 100;
+   overflow: auto;
+   box-sizing: border-box;
 }
 
 .modal {
@@ -386,6 +379,10 @@ async function onUpdateRange({ uid, start, end }) {
    border-radius: 12px;
    padding: 1.5rem;
    min-width: 280px;
+   max-width: min(100%, 420px);
+   max-height: 100%;
+   box-sizing: border-box;
+   overflow: auto;
    display: flex;
    flex-direction: column;
    gap: 1rem;
