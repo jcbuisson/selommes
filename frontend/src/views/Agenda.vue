@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useObservable } from '@vueuse/rxjs'
-import { mdiCalendarPlus } from '@mdi/js'
+import { mdiPlus } from '@mdi/js'
 
 import RangeCalendar from '/src/components/RangeCalendar.vue'
 
@@ -75,6 +75,12 @@ function parseDateInput(value) {
       throw new Error('Date de plage invalide')
    }
    return date
+}
+
+function openDatePicker(event) {
+   const input = event.currentTarget
+   input.focus()
+   input.showPicker?.()
 }
 
 function resetRangeDialog() {
@@ -230,7 +236,7 @@ async function onUpdateRange({ uid, start, end }) {
          </div>
          <button class="topbar-btn" title="Nouvelle plage" @click="openCreateDialog">
             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-               <path :d="mdiCalendarPlus" fill="currentColor" />
+               <path :d="mdiPlus" fill="currentColor" />
             </svg>
          </button>
       </header>
@@ -266,6 +272,8 @@ async function onUpdateRange({ uid, start, end }) {
                      v-model="startDateInput"
                      class="modal-input"
                      type="date"
+                     @click="openDatePicker"
+                     @touchstart="openDatePicker"
                      @keydown.enter="confirmCreate"
                      @keydown.esc="cancelCreate"
                   />
@@ -276,6 +284,8 @@ async function onUpdateRange({ uid, start, end }) {
                      v-model="endDateInput"
                      class="modal-input"
                      type="date"
+                     @click="openDatePicker"
+                     @touchstart="openDatePicker"
                      @keydown.enter="confirmCreate"
                      @keydown.esc="cancelCreate"
                   />
@@ -410,6 +420,14 @@ async function onUpdateRange({ uid, start, end }) {
 
 .modal-input:focus {
    border-color: #89b4fa;
+}
+
+.modal-input[type="date"] {
+   color-scheme: dark;
+}
+
+.modal-input[type="date"]::-webkit-calendar-picker-indicator {
+   display: none;
 }
 
 .modal-error {
