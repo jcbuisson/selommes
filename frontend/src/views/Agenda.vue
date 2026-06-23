@@ -161,6 +161,7 @@ async function confirmCreate() {
 
 function cancelCreate() {
    resetRangeDialog()
+   calendarRef.value?.clearSelection()
 }
 
 function openEditDialog(range) {
