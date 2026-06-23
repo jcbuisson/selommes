@@ -250,7 +250,7 @@ async function onUpdateRange({ uid, start, end }) {
          @range-selected="onSelectRange"
       />
 
-      <div v-if="showModal" class="modal-backdrop" @click.self="cancelCreate">
+      <div v-if="showModal" class="modal-backdrop">
          <div class="modal">
             <p v-if="rangeDialogMode === 'view'" class="modal-label">{{ labelInput }}</p>
             <template v-else>
