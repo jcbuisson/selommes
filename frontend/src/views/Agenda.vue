@@ -173,6 +173,16 @@ function openEditDialog(range) {
    showModal.value = true
 }
 
+function openViewDialog(range) {
+   rangeDialogMode.value = 'view'
+   editingRangeUid.value = null
+   labelInput.value = range.label
+   startDateInput.value = ''
+   endDateInput.value = ''
+   rangeFormError.value = ''
+   showModal.value = true
+}
+
 async function deleteEditingRange() {
    if (rangeDialogMode.value !== 'edit' || !editingRangeUid.value) return
    const uid = editingRangeUid.value
@@ -192,6 +202,10 @@ function onSelectRange(uid) {
    if (range?.user_uid === currentUserUid) {
       selectedRangeUid.value = uid
       openEditDialog(range)
+   } else if (range) {
+      selectedRangeUid.value = null
+      openViewDialog(range)
+      calendarRef.value?.clearSelection()
    } else {
       console.log('range clicked but belongs to another user:', uid)
       calendarRef.value?.clearSelection()
@@ -231,44 +245,46 @@ async function onUpdateRange({ uid, start, end }) {
 
       <div v-if="showModal" class="modal-backdrop" @click.self="cancelCreate">
          <div class="modal">
-            <p class="modal-title">{{ rangeDialogMode === 'edit' ? 'Modifier la plage' : 'Nouvelle plage' }}</p>
-            <label class="modal-field">
-               <span>Libelle</span>
-               <input
-                  v-model="labelInput"
-                  class="modal-input"
-                  type="text"
-                  autocomplete="off"
-                  autofocus
-                  @keydown.enter="confirmCreate"
-                  @keydown.esc="cancelCreate"
-               />
-            </label>
-            <label class="modal-field">
-               <span>Debut</span>
-               <input
-                  v-model="startDateInput"
-                  class="modal-input"
-                  type="date"
-                  @keydown.enter="confirmCreate"
-                  @keydown.esc="cancelCreate"
-               />
-            </label>
-            <label class="modal-field">
-               <span>Fin</span>
-               <input
-                  v-model="endDateInput"
-                  class="modal-input"
-                  type="date"
-                  @keydown.enter="confirmCreate"
-                  @keydown.esc="cancelCreate"
-               />
-            </label>
+            <p v-if="rangeDialogMode === 'view'" class="modal-label">{{ labelInput }}</p>
+            <template v-else>
+               <label class="modal-field">
+                  <span>Libelle</span>
+                  <input
+                     v-model="labelInput"
+                     class="modal-input"
+                     type="text"
+                     autocomplete="off"
+                     autofocus
+                     @keydown.enter="confirmCreate"
+                     @keydown.esc="cancelCreate"
+                  />
+               </label>
+               <label class="modal-field">
+                  <span>Debut</span>
+                  <input
+                     v-model="startDateInput"
+                     class="modal-input"
+                     type="date"
+                     @keydown.enter="confirmCreate"
+                     @keydown.esc="cancelCreate"
+                  />
+               </label>
+               <label class="modal-field">
+                  <span>Fin</span>
+                  <input
+                     v-model="endDateInput"
+                     class="modal-input"
+                     type="date"
+                     @keydown.enter="confirmCreate"
+                     @keydown.esc="cancelCreate"
+                  />
+               </label>
+            </template>
             <p v-if="rangeFormError" class="modal-error">{{ rangeFormError }}</p>
             <div class="modal-actions">
                <button v-if="rangeDialogMode === 'edit'" class="modal-btn danger" @click="deleteEditingRange">Supprimer</button>
-               <button class="modal-btn cancel" @click="cancelCreate">Annuler</button>
-               <button class="modal-btn confirm" :disabled="!labelInput.trim() || !startDateInput || !endDateInput" @click="confirmCreate">
+               <button class="modal-btn cancel" @click="cancelCreate">{{ rangeDialogMode === 'view' ? 'Fermer' : 'Annuler' }}</button>
+               <button v-if="rangeDialogMode !== 'view'" class="modal-btn confirm" :disabled="!labelInput.trim() || !startDateInput || !endDateInput" @click="confirmCreate">
                   {{ rangeDialogMode === 'edit' ? 'Enregistrer' : 'Créer' }}
                </button>
             </div>
@@ -364,13 +380,6 @@ async function onUpdateRange({ uid, start, end }) {
    gap: 1rem;
 }
 
-.modal-title {
-   margin: 0;
-   font-size: 1rem;
-   font-weight: 600;
-   color: #cdd6f4;
-}
-
 .modal-field {
    display: flex;
    flex-direction: column;
@@ -378,6 +387,13 @@ async function onUpdateRange({ uid, start, end }) {
    color: #bac2de;
    font-size: 0.85rem;
    font-weight: 600;
+}
+
+.modal-label {
+   margin: 0;
+   color: #cdd6f4;
+   font-size: 1.05rem;
+   line-height: 1.4;
 }
 
 .modal-input {
