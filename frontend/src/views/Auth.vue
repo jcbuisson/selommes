@@ -2,16 +2,18 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import useExpressXClient from '/src/use/useExpressXClient.ts';
+import useUser from '/src/use/useUser'
+import useZeroClient from '/src/use/useZeroClient.ts';
 
 const router = useRouter()
-const { app } = useExpressXClient()
+const { zero } = useZeroClient()
+const { findByEmail } = useUser(zero)
 
 const email = ref('')
 const emailSent = ref(false)
 
 async function onSubmit() {
-   const user = await app.service('user').findUnique({ email: email.value });
+   const user = await findByEmail(email.value);
    if (user) {
       localStorage.setItem('selommes_user_uid', user.uid);
       localStorage.setItem('selommes_user_color', user.color);
@@ -19,12 +21,17 @@ async function onSubmit() {
       router.push('/agenda')
    } else {
       const html = `<a href="${import.meta.env.VITE_SELOMMES_URL}/create-user?email=${encodeURIComponent(email.value)}" style="display:inline-block;padding:10px 20px;background-color:#89b4fa;color:#1e1e2e;text-decoration:none;border-radius:6px;font-weight:600;">Cliquez ici</a> pour confirmer votre inscription au calendrier de Selommes`;
-      await app.service('mail').send({
+      const response = await fetch('/api/mail', {
+         method: 'POST',
+         headers: { 'content-type': 'application/json' },
+         body: JSON.stringify({
          to: email.value,
          subject: "Selommes, confirmation de l'email",
          text: null,
          html,
+         }),
       })
+      if (!response.ok) throw new Error("Impossible d'envoyer l'email")
 
       emailSent.value = true
       // router.push({

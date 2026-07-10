@@ -7,8 +7,8 @@
   "license": "AGPL-version-3.0",
   "private": false,
   "engines": {
-    "node": ">= 14.0.0",
-    "npm": ">= 6.0.0"
+    "node": ">= 22.0.0",
+    "npm": ">= 10.0.0"
   },
   "imports": {
     "#root/*": "./*"
@@ -27,24 +27,22 @@
   },
   "contributors": [],
   "scripts": {
-    "dev": "node --watch --import tsx/esm src/app.js"
+    "dev": "node --watch --import tsx/esm src/app.js",
+    "dev:zero": "node src/dev-zero-cache.js"
   },
   "dependencies": {
-    "@jcbuisson/express-x": "^3.1.32",
-    "@jcbuisson/express-x-drizzle": "^3.1.32",
+    "@rocicorp/zero": "^1.7.0",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "express": "^5.2.1",
-    "express-x-drizzle": "^1.0.1",
-    "express-x-prisma": "^1.0.1",
     "nodemailer": "^8.0.10",
-    "pg": "^8.20.0"
+    "pg": "^8.20.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.31.10",
     "fake-indexeddb": "^6.2.5",
-    "socket.io-client": "^4.8.3",
     "tsx": "^4.21.0"
   }
 }

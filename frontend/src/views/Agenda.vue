@@ -1,6 +1,5 @@
 <script setup>
 import { ref } from 'vue'
-import { useObservable } from '@vueuse/rxjs'
 import { mdiPlus } from '@mdi/js'
 
 import RangeCalendar from '/src/components/RangeCalendar.vue'
@@ -8,13 +7,11 @@ import RangeCalendar from '/src/components/RangeCalendar.vue'
 import useRange from '/src/use/useRange';
 import useUser from '/src/use/useUser';
 
-import useExpressXClient from '/src/use/useExpressXClient.ts';
+import useZeroClient from '/src/use/useZeroClient.ts';
 
-const { app } = useExpressXClient()
-const { getObservable: ranges$, create: createRange, update: updateRange, remove: removeRange } = useRange(app);
-const { findByUID: findUserByUID } = useUser(app);
-
-const ranges = useObservable(ranges$({}))
+const { zero } = useZeroClient()
+const { ranges, create: createRange, update: updateRange, remove: removeRange } = useRange(zero);
+const { findByUID: findUserByUID } = useUser(zero);
 
 const showModal = ref(false)
 const labelInput = ref('')
@@ -38,19 +35,11 @@ async function getCurrentUser() {
    const uid = localStorage.getItem('selommes_user_uid')
    if (!uid) throw new Error('Utilisateur non connecté')
 
-   let user = null
-   if (app.isConnected) {
-      user = await app.service('user').findUnique({ uid })
-      if (!user) {
-         throw new Error("Le compte utilisateur n'est pas encore synchronisé")
-      }
-   } else {
-      user = await findUserByUID(uid)
-      if (!user) {
-         const name = localStorage.getItem('selommes_user_name')
-         const color = localStorage.getItem('selommes_user_color')
-         if (name && color) user = { uid, name, color }
-      }
+   let user = await findUserByUID(uid)
+   if (!user) {
+      const name = localStorage.getItem('selommes_user_name')
+      const color = localStorage.getItem('selommes_user_color')
+      if (name && color) user = { uid, name, color }
    }
 
    if (!user?.name || !user?.color) {

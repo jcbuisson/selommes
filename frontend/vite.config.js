@@ -57,12 +57,7 @@ export default defineConfig({
       open: true,
       host: true, // allows for external device connection on local network
       proxy: {
-         '^/selommes-socket-io/.*': {
-            target: 'http://localhost:3000',
-            ws: true,
-            secure: false,
-            changeOrigin: true,
-         },
+         '^/api/.*': 'http://localhost:3000',
          '^/static/.*': 'http://localhost:3000',
       }
    },

@@ -1,22 +1,20 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { useObservable } from '@vueuse/rxjs'
 
 import useUser from '/src/use/useUser'
-import useExpressXClient from '/src/use/useExpressXClient.ts'
+import useZeroClient from '/src/use/useZeroClient.ts'
 import COLORS from '/src/colors.mjs'
 
 const props = defineProps({
    email: { type: String, default: '' },
 })
 
-const { app } = useExpressXClient()
-const { create: createUser, getObservable: users$ } = useUser(app)
+const { zero } = useZeroClient()
+const { create: createUser, users } = useUser(zero)
 
 const router = useRouter()
 
-const users = useObservable(users$({}))
 const usedColors = computed(() => new Set(users.value?.map(u => u.color) ?? []))
 
 const email = ref(props.email)

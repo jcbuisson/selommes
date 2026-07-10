@@ -13,6 +13,9 @@ dist
 .env
 .env.development
 
+# Rocicorp Zero local cache
+/backend/zero.db*
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -2,9 +2,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 import Agenda from '/src/views/Agenda.vue'
-import useExpressXClient from '/src/use/useExpressXClient.ts'
-
-const { app } = useExpressXClient()
 
 const routes = [
    {
@@ -51,7 +48,7 @@ const router = createRouter({
 router.beforeEach(async (to, from) => {
    console.log('from', from.path, 'to', to.path)
 
-   if (to.meta.requiresConnection && app.isConnected === false/* app.isConnected is undefined on startup */) {
+   if (to.meta.requiresConnection && navigator.onLine === false) {
       return { path: '/not-connected' }
    }
 
