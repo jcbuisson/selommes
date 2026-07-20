@@ -8,6 +8,7 @@ import { io } from 'socket.io-client'
 import { Command, InvalidArgumentError } from 'commander'
 import { createClient } from '@jcbuisson/express-x-client'
 
+
 const DEFAULT_URL = process.env.SELOMMES_URL || 'https://selommes.jcbuisson.dev'
 const DEFAULT_PATH = process.env.SELOMMES_SOCKET_PATH || '/selommes-socket-io/'
 const DEFAULT_TIMEOUT = 20000

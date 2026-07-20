@@ -16,7 +16,10 @@
     "selommes-client": "node scripts/selommes-client.js"
   },
   "dependencies": {
+    "@electric-sql/client": "^1.5.24",
+    "@jcbuisson/express-x": "^4.0.4",
     "@jcbuisson/express-x-client": "^3.1.33",
+    "@jcbuisson/express-x-plugins": "^4.0.1",
     "@mdi/js": "^7.4.47",
     "@vueuse/core": "^14.2.1",
     "@vueuse/rxjs": "^14.2.1",

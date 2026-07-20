@@ -57,13 +57,12 @@ export default defineConfig({
       open: true,
       host: true, // allows for external device connection on local network
       proxy: {
+         '/electric': 'http://localhost:8000',
          '^/selommes-socket-io/.*': {
-            target: 'http://localhost:3000',
+            target: 'http://localhost:8000',
             ws: true,
-            secure: false,
-            changeOrigin: true,
          },
-         '^/static/.*': 'http://localhost:3000',
+         '^/static/.*': 'http://localhost:8000',
       }
    },
 })

@@ -1,26 +1,31 @@
 import 'dotenv/config'
 import express from 'express'
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { eq } from 'drizzle-orm';
+import pg from 'pg'
 
-import { expressX, reloadPlugin } from '@jcbuisson/express-x'
-import { drizzleOfflinePlugin } from '@jcbuisson/express-x-drizzle'
+import { expressX } from '@jcbuisson/express-x/server'
+import { electricOfflinePlugin } from '@jcbuisson/express-x-plugins/electric-server'
+import { reloadPlugin } from '@jcbuisson/express-x-plugins/reload-server'
 
 import mailService from '#root/src/mail.service.js'
 
 // import authService from '#root/src/services/auth.service.js'
-import publish from './publish.js'
-import { metadata, user, range } from '#root/src/db/schema.js';
+import publish from '#root/src/publish.js'
+
 
 const app = expressX({
    WS_TRANSPORT: true,
    WS_PATH: '/selommes-socket-io/',
 })
 
-const db = drizzle(process.env.DATABASE_URL);
+const { Pool } = pg
+const db = new Pool({ connectionString: process.env.DATABASE_URL })
 
-// add offline synchronization and database services for models 'user' and 'range'
-app.configure(drizzleOfflinePlugin, db, metadata, [ user, range ])
+app.configure(electricOfflinePlugin, db, ['user', 'range'], {
+   // ElectricSQL sync service
+   electricUrl: process.env.ELECTRIC_URL,
+   // Development-only: add real session/ownership checks in production
+   authorize: async () => true,
+})
 
 // app.configure(authService);
 app.configure(mailService)
@@ -38,5 +43,5 @@ app.on('connection', (socket) => {
 // development only: serve static assets
 // app.use('/static', express.static('./static'))
 
-const PORT = process.env.PORT || 3000
+const PORT = process.env.PORT
 app.httpServer.listen(PORT, () => console.log(`App listening at http://localhost:${PORT}`))

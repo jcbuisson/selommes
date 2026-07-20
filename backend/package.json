@@ -27,23 +27,21 @@
   },
   "contributors": [],
   "scripts": {
-    "dev": "node --watch --import tsx/esm src/app.js"
+    "dev": "node --watch --import tsx/esm src/app.js",
+    "electric:up": "docker compose up -d --wait",
+    "electric:down": "docker compose down",
+    "electric:reset": "docker compose down --volumes"
   },
   "dependencies": {
-    "@jcbuisson/express-x": "^3.1.32",
-    "@jcbuisson/express-x-drizzle": "^3.1.32",
+    "@jcbuisson/express-x": "^4.0.4",
+    "@jcbuisson/express-x-plugins": "^4.0.1",
     "dotenv": "^17.4.2",
-    "drizzle-orm": "^0.45.2",
     "express": "^5.2.1",
-    "express-x-drizzle": "^1.0.1",
-    "express-x-prisma": "^1.0.1",
     "nodemailer": "^8.0.10",
     "pg": "^8.20.0"
   },
   "devDependencies": {
     "@types/pg": "^8.20.0",
-    "drizzle-kit": "^0.31.10",
-    "fake-indexeddb": "^6.2.5",
     "socket.io-client": "^4.8.3",
     "tsx": "^4.21.0"
   }

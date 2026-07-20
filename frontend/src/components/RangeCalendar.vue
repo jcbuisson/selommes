@@ -81,13 +81,20 @@ const activeRange = computed(() => {
       : { start: selectionEnd.value, end: selectionStart.value }
 })
 
+function startOfCalendarDay(value) {
+   const date = value instanceof Date ? value : new Date(value)
+   return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
 // Prop ranges with Date objects normalised and a stable band index
 const normalizedRanges = computed(() =>
    props.ranges.map((r, i) => ({
       ...r,
       band: i,
-      start: r.start instanceof Date ? r.start : new Date(r.start),
-      end:   r.end   instanceof Date ? r.end   : new Date(r.end),
+      // Ranges are calendar dates. Strip their time/offset before comparing
+      // them with day cells so a same-day range cannot fall between midnights.
+      start: startOfCalendarDay(r.start),
+      end:   startOfCalendarDay(r.end),
    }))
 )
 

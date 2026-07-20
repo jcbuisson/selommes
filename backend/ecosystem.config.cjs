@@ -1,7 +1,6 @@
 
 module.exports = {
    apps : [
-
       {
          name: "selommes",
          script: "./src/app.js",
