@@ -1,7 +1,8 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useObservable } from '@vueuse/rxjs'
 import { mdiPlus } from '@mdi/js'
+import { useLocalStorage } from '@vueuse/core'
 
 import RangeCalendar from '/src/components/RangeCalendar.vue'
 
@@ -12,9 +13,18 @@ import useExpressXClient from '/src/use/useExpressXClient.ts';
 
 const { app } = useExpressXClient()
 const { getObservable: ranges$, create: createRange, update: updateRange, remove: removeRange } = useRange(app);
-const { findByUID: findUserByUID } = useUser(app);
+const { getObservable: users$ } = useUser(app);
 
 const ranges = useObservable(ranges$({}))
+
+const currentUserUid = useLocalStorage('selommes_user_uid');
+const usersUid = useObservable(users$({ uid: currentUserUid?.value }));
+
+const currentUserX = computed(() => {
+   if (!currentUserUid.value) return
+   if (usersUid.value.length === 0) return
+   return usersUid.value[0]
+})
 
 const showModal = ref(false)
 const labelInput = ref('')
@@ -25,41 +35,12 @@ const rangeDialogMode = ref('create')
 const editingRangeUid = ref(null)
 const selectedRangeUid = ref(null)
 const calendarRef = ref(null)
-const currentUserUid = localStorage.getItem('selommes_user_uid')
 
 function formatDateInput(date) {
    const year = date.getFullYear()
    const month = String(date.getMonth() + 1).padStart(2, '0')
    const day = String(date.getDate()).padStart(2, '0')
    return `${year}-${month}-${day}`
-}
-
-async function getCurrentUser() {
-   const uid = localStorage.getItem('selommes_user_uid')
-   if (!uid) throw new Error('Utilisateur non connecté')
-
-   let user = null
-   if (app.isConnected) {
-      user = await app.service('user').findUnique({ uid })
-      if (!user) {
-         throw new Error("Le compte utilisateur n'est pas encore synchronisé")
-      }
-   } else {
-      user = await findUserByUID(uid)
-      if (!user) {
-         const name = localStorage.getItem('selommes_user_name')
-         const color = localStorage.getItem('selommes_user_color')
-         if (name && color) user = { uid, name, color }
-      }
-   }
-
-   if (!user?.name || !user?.color) {
-      throw new Error('Le profil utilisateur est incomplet')
-   }
-
-   localStorage.setItem('selommes_user_name', user.name)
-   localStorage.setItem('selommes_user_color', user.color)
-   return user
 }
 
 function serializeDate(value) {
@@ -85,13 +66,12 @@ function resetRangeDialog() {
 }
 
 async function createCurrentUserRange(start, end) {
-   const user = await getCurrentUser()
    return createRange({
       label: labelInput.value.trim(),
-      color: user.color,
+      color: currentUserX?.value?.color,
       start: serializeDate(start),
       end: serializeDate(end),
-      user_uid: user.uid,
+      user_uid: currentUserX?.value?.uid,
    })
 }
 
@@ -120,8 +100,7 @@ async function onNewRange({ start, end }) {
 async function openCreateDialog() {
    const today = new Date()
    const defaultDate = formatDateInput(today)
-   const user = await getCurrentUser()
-   labelInput.value = user.name
+   labelInput.value = currentUserX?.value?.name
    startDateInput.value = defaultDate
    endDateInput.value = defaultDate
    rangeDialogMode.value = 'create'
@@ -200,7 +179,7 @@ function onSelectRange(uid) {
       return
    }
    const range = ranges.value?.find(r => r.uid === uid)
-   if (range?.user_uid === currentUserUid) {
+   if (range?.user_uid === currentUserUid?.value) {
       selectedRangeUid.value = uid
       openEditDialog(range)
    } else if (range) {

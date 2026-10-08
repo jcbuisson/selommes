@@ -6,7 +6,7 @@
 import { randomUUID } from 'node:crypto'
 import { io } from 'socket.io-client'
 import { Command, InvalidArgumentError } from 'commander'
-import { createClient } from '@jcbuisson/express-x-client'
+import { createClient } from '@jcbuisson/express-x/client'
 
 
 const DEFAULT_URL = process.env.SELOMMES_URL || 'https://selommes.jcbuisson.dev'
@@ -15,6 +15,9 @@ const DEFAULT_TIMEOUT = 20000
 
 let app
 let timeout
+const clientId = randomUUID()
+let revision = 0
+const mutation = () => ({ clientId, revision: ++revision })
 
 const program = new Command()
    .name('selommes-client')
@@ -22,7 +25,7 @@ const program = new Command()
    .option('--url <url>', 'Backend URL', DEFAULT_URL)
    .option('--path <path>', 'Socket.IO path', DEFAULT_PATH)
    .option('--timeout <ms>', 'Request timeout in milliseconds', parseTimeout, DEFAULT_TIMEOUT)
-   .option('--verbose', 'Enable @jcbuisson/express-x-client debug logs')
+   .option('--verbose', 'Enable @jcbuisson/express-x debug logs')
 
 const user = program
    .command('user')
@@ -149,11 +152,11 @@ async function runCommand(options, handler, validateOptions, print = printResult
 }
 
 async function listUsers() {
-   return app.service('user', { timeout }).findMany({})
+   return app.service('user', { timeout }).findMany({ deleted: false })
 }
 
 async function getUser(options) {
-   const user = await app.service('user', { timeout }).findUnique({ uid: options.uid })
+   const user = await app.service('user', { timeout }).findUnique({ uid: options.uid, deleted: false })
    if (!user) throw new Error(`User not found: ${options.uid}`)
    return user
 }
@@ -166,12 +169,12 @@ async function createUser(options) {
       color: options.color,
    }
 
-   return app.service('user', { timeout }).createWithMeta(uid, data, new Date().toISOString())
+   return app.service('user', { timeout }).create(uid, data, mutation())
 }
 
 async function editUser(options) {
    const uid = options.uid
-   const existing = await app.service('user', { timeout }).findUnique({ uid })
+   const existing = await app.service('user', { timeout }).findUnique({ uid, deleted: false })
    if (!existing) throw new Error(`User not found: ${uid}`)
 
    const data = {
@@ -180,19 +183,19 @@ async function editUser(options) {
       color: options.color || existing.color,
    }
 
-   return app.service('user', { timeout }).updateWithMeta(uid, data, new Date().toISOString())
+   return app.service('user', { timeout }).update(uid, data, mutation())
 }
 
 async function deleteUser(options) {
-   return app.service('user', { timeout }).deleteWithMeta(options.uid, new Date().toISOString())
+   return app.service('user', { timeout }).delete(options.uid, mutation())
 }
 
 async function listRanges() {
-   return app.service('range', { timeout }).findMany({})
+   return app.service('range', { timeout }).findMany({ deleted: false })
 }
 
 async function getRange(options) {
-   const range = await app.service('range', { timeout }).findUnique({ uid: options.uid })
+   const range = await app.service('range', { timeout }).findUnique({ uid: options.uid, deleted: false })
    if (!range) throw new Error(`Range not found: ${options.uid}`)
    return range
 }
@@ -203,7 +206,7 @@ async function createRange(options) {
    ensureChronologicalRange(start, end)
 
    const userUid = options.userUid
-   const user = await app.service('user', { timeout }).findUnique({ uid: userUid })
+   const user = await app.service('user', { timeout }).findUnique({ uid: userUid, deleted: false })
    if (!user) throw new Error(`User not found: ${userUid}`)
 
    const uid = options.uid || randomUUID()
@@ -215,16 +218,16 @@ async function createRange(options) {
       end,
    }
 
-   return app.service('range', { timeout }).createWithMeta(uid, data, new Date().toISOString())
+   return app.service('range', { timeout }).create(uid, data, mutation())
 }
 
 async function editRange(options) {
    const uid = options.uid
-   const existing = await app.service('range', { timeout }).findUnique({ uid })
+   const existing = await app.service('range', { timeout }).findUnique({ uid, deleted: false })
    if (!existing) throw new Error(`Range not found: ${uid}`)
 
    if (options.userUid) {
-      const user = await app.service('user', { timeout }).findUnique({ uid: options.userUid })
+      const user = await app.service('user', { timeout }).findUnique({ uid: options.userUid, deleted: false })
       if (!user) throw new Error(`User not found: ${options.userUid}`)
    }
 
@@ -237,11 +240,11 @@ async function editRange(options) {
    }
    ensureChronologicalRange(data.start, data.end)
 
-   return app.service('range', { timeout }).updateWithMeta(uid, data, new Date().toISOString())
+   return app.service('range', { timeout }).update(uid, data, mutation())
 }
 
 async function deleteRange(options) {
-   return app.service('range', { timeout }).deleteWithMeta(options.uid, new Date().toISOString())
+   return app.service('range', { timeout }).delete(options.uid, mutation())
 }
 
 function validateUserCreateOptions(options) {

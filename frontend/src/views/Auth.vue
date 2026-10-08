@@ -3,19 +3,20 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import useExpressXClient from '/src/use/useExpressXClient.ts';
+import useUser from '/src/use/useUser';
 
 const router = useRouter()
 const { app } = useExpressXClient()
+const { findMany: findUsers } = useUser(app);
 
 const email = ref('')
 const emailSent = ref(false)
 
+
 async function onSubmit() {
-   const user = await app.service('user').findUnique({ email: email.value });
+   const user = await findUsers({ email: email.value }).then(rows => rows[0] ?? null);
    if (user) {
       localStorage.setItem('selommes_user_uid', user.uid);
-      localStorage.setItem('selommes_user_color', user.color);
-      localStorage.setItem('selommes_user_name', user.name);
       router.push('/agenda')
    } else {
       const html = `<a href="${import.meta.env.VITE_SELOMMES_URL}/create-user?email=${encodeURIComponent(email.value)}" style="display:inline-block;padding:10px 20px;background-color:#89b4fa;color:#1e1e2e;text-decoration:none;border-radius:6px;font-weight:600;">Cliquez ici</a> pour confirmer votre inscription au calendrier de Selommes`;
@@ -27,10 +28,6 @@ async function onSubmit() {
       })
 
       emailSent.value = true
-      // router.push({
-      //    path: '/create-user',
-      //    query: { email: email.value },
-      // })
    }
 }
 </script>

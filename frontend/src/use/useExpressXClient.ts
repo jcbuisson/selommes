@@ -1,6 +1,6 @@
 import { io, Socket } from "socket.io-client";
 import { createClient } from '@jcbuisson/express-x/client'
-// import { reloadPlugin, electricClientPlugin } from '@jcbuisson/express-x-plugins/electric-client'
+// import { reloadPlugin } from '@jcbuisson/express-x-plugins/reload-client'
 import { electricClientPlugin } from '@jcbuisson/express-x-plugins/electric-client'
 
 // import { setExpiresAt } from "/src/use/useAppState"
@@ -11,7 +11,6 @@ let socket: Socket | null = null;
 let app: any = null;
 
 const socketOptions = {
-   // path: '/shdl-socket-io/',
    path: '/selommes-socket-io/',
    transports: ["websocket"],
    reconnectionDelay: 1000,

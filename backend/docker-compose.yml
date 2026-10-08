@@ -1,5 +1,5 @@
 services:
-  electric:
+  electric-selommes:
     image: electricsql/electric:latest
     environment:
       DATABASE_URL: postgresql://chris:eureka31@host.docker.internal:5432/selommes

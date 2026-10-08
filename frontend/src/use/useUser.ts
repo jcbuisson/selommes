@@ -1,7 +1,9 @@
 
+import useElectricModel from './useElectricModel'
+
 let model;
 
 export default function(app) {
-   if (!model) model = app.createElectricModel('user');
+   if (!model) model = useElectricModel(app, 'user');
    return { ...model }
 }

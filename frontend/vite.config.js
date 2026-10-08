@@ -5,6 +5,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+   worker: { format: 'es' },
 
   plugins: [
       vue(),
@@ -23,6 +24,10 @@ export default defineConfig({
             "selommes-icon-180.png",
          ],
          strategies: "injectManifest",
+         injectManifest: {
+            globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest,wasm,data}'],
+            maximumFileSizeToCacheInBytes: 12 * 1024 * 1024,
+         },
          manifest: {
             name: "Selommes",
             short_name: "Selommes",

@@ -38,8 +38,6 @@ async function onSubmit() {
    })
    console.log('user', user);
    localStorage.setItem('selommes_user_uid', user.uid);
-   localStorage.setItem('selommes_user_color', user.color);
-   localStorage.setItem('selommes_user_name', user.name);
    router.push('/agenda');
 }
 </script>

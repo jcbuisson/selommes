@@ -33,8 +33,8 @@
     "electric:reset": "docker compose down --volumes"
   },
   "dependencies": {
-    "@jcbuisson/express-x": "^4.0.4",
-    "@jcbuisson/express-x-plugins": "^4.0.1",
+    "@jcbuisson/express-x": "^4.0.5",
+    "@jcbuisson/express-x-plugins": "^5.0.1",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "nodemailer": "^8.0.10",
