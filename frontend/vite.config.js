@@ -6,6 +6,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 // https://vite.dev/config/
 export default defineConfig({
    worker: { format: 'es' },
+   // Keep PGlite's WASM/data URLs relative to its package during development.
+   optimizeDeps: { exclude: ['@electric-sql/pglite'] },
 
   plugins: [
       vue(),

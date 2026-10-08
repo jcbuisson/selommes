@@ -2,6 +2,15 @@ import { io, Socket } from "socket.io-client";
 import { createClient } from '@jcbuisson/express-x/client'
 // import { reloadPlugin } from '@jcbuisson/express-x-plugins/reload-client'
 import { electricClientPlugin } from '@jcbuisson/express-x-plugins/electric-client'
+import { ShapeStream } from '@electric-sql/client'
+
+class SyncShapeStream extends ShapeStream {
+   constructor(options: any) {
+      // The offline plugin stores rows as JSON. Keep BIGINT versions lossless
+      // and serializable, matching pg's string representation on the server.
+      super({ ...options, parser: { ...options.parser, int8: (value: string) => value } })
+   }
+}
 
 // import { setExpiresAt } from "/src/use/useAppState"
 // import { useAuthentication } from "/src/use/useAuthentication"
@@ -26,6 +35,7 @@ export default function useExpressXClient() {
       app = createClient(socket, { debug: false });
 
       app.configure(electricClientPlugin, {
+         ShapeStream: SyncShapeStream,
          // Electric's client constructs a URL directly, so it requires an absolute URL.
          shapePath: new URL('/electric/v1/shape', window.location.origin).href,
       })

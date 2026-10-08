@@ -12,8 +12,8 @@ export default function useElectricModel(app: any, name: string) {
    const ready = database.then(async db => {
       const channel = new BroadcastChannel(`selommes-sync-${name}`)
       let model: any
-      const createModel = () => app.createElectricModel(name, {
-         primaryKey: 'uid', localDb: db, channel, ownsSync: db.isLeader,
+      const createModel = (ownsSync = false) => app.createElectricModel(name, {
+         primaryKey: 'uid', localDb: db, channel, ownsSync,
       })
       model = createModel()
       // Serialize the shared schema initialization across models in this tab.
@@ -21,12 +21,15 @@ export default function useElectricModel(app: any, name: string) {
       await preparation
       model.start()
       const models = new BehaviorSubject(model)
-      db.onLeaderChange(() => {
+      // PGlite's database election and Electric's stream ownership are separate.
+      // A browser lock elects one sync owner per model and transfers on tab close.
+      void navigator.locks.request(`selommes-electric-${name}`, async () => {
          model.stop()
-         model = createModel()
+         model = createModel(true)
          model.start()
          models.next(model)
          channel.postMessage({ modelName: name })
+         await new Promise(() => {})
       })
       return { current: () => model, models }
    })

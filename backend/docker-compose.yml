@@ -4,5 +4,6 @@ services:
     environment:
       DATABASE_URL: postgresql://chris:eureka31@host.docker.internal:5432/selommes
       ELECTRIC_INSECURE: "true"
+      ELECTRIC_REPLICATION_STREAM_ID: "selommes"
     ports:
-      - "3001:3000"
+      - "3217:3000"

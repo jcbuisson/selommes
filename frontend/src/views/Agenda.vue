@@ -22,7 +22,7 @@ const usersUid = useObservable(users$({ uid: currentUserUid?.value }));
 
 const currentUserX = computed(() => {
    if (!currentUserUid.value) return
-   if (usersUid.value.length === 0) return
+   if (!usersUid.value?.length) return
    return usersUid.value[0]
 })
 
@@ -66,12 +66,14 @@ function resetRangeDialog() {
 }
 
 async function createCurrentUserRange(start, end) {
+   const user = currentUserX.value
+   if (!user) throw new Error('Votre profil est en cours de chargement. Réessayez dans quelques instants.')
    return createRange({
-      label: labelInput.value.trim(),
-      color: currentUserX?.value?.color,
+      label: labelInput.value.trim() || user.name,
+      color: user.color,
       start: serializeDate(start),
       end: serializeDate(end),
-      user_uid: currentUserX?.value?.uid,
+      user_uid: user.uid,
    })
 }
 
@@ -89,9 +91,11 @@ async function updateRangeDates(uid, start, end) {
 }
 
 async function onNewRange({ start, end }) {
-   console.log('select!')
+   rangeFormError.value = ''
    try {
       await createCurrentUserRange(start, end)
+   } catch (error) {
+      rangeFormError.value = error.message || 'Impossible de créer la plage'
    } finally {
       calendarRef.value?.clearSelection()
    }
@@ -100,7 +104,7 @@ async function onNewRange({ start, end }) {
 async function openCreateDialog() {
    const today = new Date()
    const defaultDate = formatDateInput(today)
-   labelInput.value = currentUserX?.value?.name
+   labelInput.value = currentUserX.value?.name ?? ''
    startDateInput.value = defaultDate
    endDateInput.value = defaultDate
    rangeDialogMode.value = 'create'
@@ -124,15 +128,13 @@ async function confirmCreate() {
          return
       }
 
-      showModal.value = false
       if (rangeDialogMode.value === 'edit' && editingRangeUid.value) {
          const uid = editingRangeUid.value
-         editingRangeUid.value = null
-         rangeDialogMode.value = 'create'
          await updateRangeDates(uid, start, end)
       } else {
          await createCurrentUserRange(start, end)
       }
+      resetRangeDialog()
    } catch (error) {
       rangeFormError.value = error.message || 'Impossible de creer la plage'
    }
@@ -222,6 +224,7 @@ async function onUpdateRange({ uid, start, end }) {
          @update="onUpdateRange"
          @range-selected="onSelectRange"
       />
+      <p v-if="rangeFormError && !showModal" class="modal-error" role="alert">{{ rangeFormError }}</p>
 
       <div v-if="showModal" class="modal-backdrop">
          <div class="modal">
