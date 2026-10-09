@@ -1,6 +1,8 @@
 services:
   electric-selommes:
     image: electricsql/electric:latest
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       DATABASE_URL: postgresql://chris:eureka31@host.docker.internal:5432/selommes
       ELECTRIC_INSECURE: "true"
