@@ -31,6 +31,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits([
+   'date-selected',  // a day cell is clicked
    'new-range',      // a new range is created by draging date numbers
    'update',         // after a range selection, a start or end boundary is changed
    'range-selected', // a range is selected
@@ -237,6 +238,7 @@ defineExpose({ clearSelection })
             class="day-cell"
             :class="[dayClasses(day.date), { 'other-month': !day.inMonth }]"
             :data-date="day.date.toISOString()"
+            @click="emit('date-selected', day.date)"
          >
             {{ day.date.getDate() }}
          </div>

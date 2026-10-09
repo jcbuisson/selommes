@@ -21,24 +21,29 @@ const { Pool } = pg
 const db = new Pool({ connectionString: process.env.DATABASE_URL })
 
 const models = [
-   { name: 'user', primaryKey: 'uid', tombstoneData: { email: null, name: '', color: '' } },
-   { name: 'range', primaryKey: 'uid', tombstoneData: { start: '', end: '', label: '', color: '', user_uid: null } },
+   {
+      name: 'user',
+      primaryKey: 'uid',
+      // necessary because email is declared unique and not null
+      tombstoneData: ({ id }) => ({
+         email: `deleted-${id}@tombstone.invalid`,
+         name: '',
+         color: '',
+      }),
+   },
+   {
+      name: 'range',
+      primaryKey: 'uid',
+      tombstoneData: { start: '', end: '', label: '', color: '', user_uid: null }
+   },
 ]
 
 await prepareElectricSyncSchema(db, models)
-// Deleted users release their unique email while active users still require one.
-await db.query(`ALTER TABLE "user" ALTER COLUMN email DROP NOT NULL`)
-await db.query(`DO $$ BEGIN
-   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = '"user"'::regclass AND conname = 'user_active_email_required') THEN
-      ALTER TABLE "user" ADD CONSTRAINT user_active_email_required CHECK (deleted OR email IS NOT NULL);
-   END IF;
-END $$`)
 
 app.configure(electricServerPlugin, db, models, {
    sync: true,
-   // ElectricSQL sync service
    electricUrl: process.env.ELECTRIC_URL,
-   // Development-only: add real session/ownership checks in production
+   // TODO: add real session/ownership checks in production
    authorize: async () => true,
 })
 

@@ -2,15 +2,6 @@ import { io, Socket } from "socket.io-client";
 import { createClient } from '@jcbuisson/express-x/client'
 // import { reloadPlugin } from '@jcbuisson/express-x-plugins/reload-client'
 import { electricClientPlugin } from '@jcbuisson/express-x-plugins/electric-client'
-import { ShapeStream } from '@electric-sql/client'
-
-class SyncShapeStream extends ShapeStream {
-   constructor(options: any) {
-      // The offline plugin stores rows as JSON. Keep BIGINT versions lossless
-      // and serializable, matching pg's string representation on the server.
-      super({ ...options, parser: { ...options.parser, int8: (value: string) => value } })
-   }
-}
 
 // import { setExpiresAt } from "/src/use/useAppState"
 // import { useAuthentication } from "/src/use/useAuthentication"
@@ -24,9 +15,6 @@ const socketOptions = {
    transports: ["websocket"],
    reconnectionDelay: 1000,
    reconnectionDelayMax: 10000,
-   extraHeaders: {
-      "bearer-token": "mytoken",
-   },
 };
 
 export default function useExpressXClient() {
@@ -35,7 +23,11 @@ export default function useExpressXClient() {
       app = createClient(socket, { debug: false });
 
       app.configure(electricClientPlugin, {
-         ShapeStream: SyncShapeStream,
+         sync: true,
+         databaseName: 'selommes-sync',
+         onError: (error: unknown, { modelName }: { modelName: string }) => {
+            console.error(`Electric sync failed for ${modelName}`, error)
+         },
          // Electric's client constructs a URL directly, so it requires an absolute URL.
          shapePath: new URL('/electric/v1/shape', window.location.origin).href,
       })
@@ -69,4 +61,11 @@ export default function useExpressXClient() {
    }
 
    return { app };
+}
+
+if (import.meta.hot) {
+   import.meta.hot.dispose(() => {
+      void app?.disposeElectricSync()
+      socket?.disconnect()
+   })
 }

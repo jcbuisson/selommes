@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { useObservable } from '@vueuse/rxjs'
 import { mdiPlus } from '@mdi/js'
 import { useLocalStorage } from '@vueuse/core'
@@ -27,6 +27,8 @@ const currentUserX = computed(() => {
 })
 
 const showModal = ref(false)
+const pendingRangeDate = ref(null)
+const rangeConfirmationRef = ref(null)
 const labelInput = ref('')
 const startDateInput = ref('')
 const endDateInput = ref('')
@@ -56,6 +58,12 @@ function parseDateInput(value) {
       throw new Error('Date de plage invalide')
    }
    return date
+}
+
+function formatDisplayDate(value) {
+   return parseDateInput(value).toLocaleDateString('fr-FR', {
+      day: 'numeric', month: 'long', year: 'numeric',
+   })
 }
 
 function resetRangeDialog() {
@@ -101,9 +109,27 @@ async function onNewRange({ start, end }) {
    }
 }
 
-async function openCreateDialog() {
-   const today = new Date()
-   const defaultDate = formatDateInput(today)
+async function onDateSelected(date) {
+   pendingRangeDate.value = date
+   await nextTick()
+   rangeConfirmationRef.value?.showModal()
+}
+
+function cancelRangeConfirmation() {
+   rangeConfirmationRef.value?.close()
+   pendingRangeDate.value = null
+}
+
+function confirmNewRange() {
+   const date = pendingRangeDate.value
+   cancelRangeConfirmation()
+   if (date) openCreateDialog(date)
+}
+
+function openCreateDialog(date = new Date()) {
+   const defaultDate = formatDateInput(date)
+   selectedRangeUid.value = null
+   calendarRef.value?.clearSelection()
    labelInput.value = currentUserX.value?.name ?? ''
    startDateInput.value = defaultDate
    endDateInput.value = defaultDate
@@ -159,8 +185,8 @@ function openViewDialog(range) {
    rangeDialogMode.value = 'view'
    editingRangeUid.value = null
    labelInput.value = range.label
-   startDateInput.value = ''
-   endDateInput.value = ''
+   startDateInput.value = formatDateInput(new Date(range.start))
+   endDateInput.value = formatDateInput(new Date(range.end))
    rangeFormError.value = ''
    showModal.value = true
 }
@@ -209,7 +235,7 @@ async function onUpdateRange({ uid, start, end }) {
             <img class="topbar-icon" src="/selommes-icon.svg" alt="" />
             <span class="topbar-title">Selommes</span>
          </div>
-         <button class="topbar-btn" title="Nouvelle plage" @click="openCreateDialog">
+         <button class="topbar-btn" title="Nouvelle plage" @click="openCreateDialog()">
             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                <path :d="mdiPlus" fill="currentColor" />
             </svg>
@@ -221,14 +247,39 @@ async function onUpdateRange({ uid, start, end }) {
          :ranges="ranges"
          :current-user-uid="currentUserUid"
          @new-range="onNewRange"
+         @date-selected="onDateSelected"
          @update="onUpdateRange"
          @range-selected="onSelectRange"
       />
       <p v-if="rangeFormError && !showModal" class="modal-error" role="alert">{{ rangeFormError }}</p>
 
+      <dialog
+         v-if="pendingRangeDate"
+         ref="rangeConfirmationRef"
+         class="modal range-confirmation"
+         aria-labelledby="range-confirmation-question"
+         @cancel.prevent="cancelRangeConfirmation"
+      >
+         <p id="range-confirmation-question" class="modal-label">Voulez-vous créer une nouvelle plage de dates ?</p>
+         <div class="modal-actions">
+            <button class="modal-btn cancel" autofocus @click="cancelRangeConfirmation">Non</button>
+            <button class="modal-btn confirm" @click="confirmNewRange">Oui</button>
+         </div>
+      </dialog>
+
       <div v-if="showModal" class="modal-backdrop">
          <div class="modal">
-            <p v-if="rangeDialogMode === 'view'" class="modal-label">{{ labelInput }}</p>
+            <template v-if="rangeDialogMode === 'view'">
+               <p class="modal-label">{{ labelInput }}</p>
+               <div class="modal-field">
+                  <span>Début</span>
+                  <time :datetime="startDateInput">{{ formatDisplayDate(startDateInput) }}</time>
+               </div>
+               <div class="modal-field">
+                  <span>Fin</span>
+                  <time :datetime="endDateInput">{{ formatDisplayDate(endDateInput) }}</time>
+               </div>
+            </template>
             <template v-else>
                <label class="modal-field">
                   <span>Libelle</span>
@@ -377,6 +428,10 @@ async function onUpdateRange({ uid, start, end }) {
    color: #bac2de;
    font-size: 0.85rem;
    font-weight: 600;
+}
+
+.range-confirmation::backdrop {
+   background: rgba(0, 0, 0, 0.5);
 }
 
 .modal-label {
