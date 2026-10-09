@@ -3,6 +3,13 @@
 Shared calendar built with Vue/Vite, Express-X, PostgreSQL and Electric. The Electric
 client plugin manages a persistent PGlite database and synchronization across browser tabs.
 
+## Admin
+```js
+npx @jcbuisson/selommes-client user list
+npx @jcbuisson/selommes-client range list
+npx @jcbuisson/selommes-client range --help
+```
+
 ## Install and run the development version
 
 ### Prerequisites

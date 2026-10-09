@@ -24,7 +24,7 @@ const models = [
    {
       name: 'user',
       primaryKey: 'uid',
-      // necessary because email is declared unique and not null
+      // dynamic tombstone data is necessary for this table because email is declared unique and not null
       tombstoneData: ({ id }) => ({
          email: `deleted-${id}@tombstone.invalid`,
          name: '',
@@ -34,6 +34,7 @@ const models = [
    {
       name: 'range',
       primaryKey: 'uid',
+      // static tombstone data here is enough
       tombstoneData: { start: '', end: '', label: '', color: '', user_uid: null }
    },
 ]
