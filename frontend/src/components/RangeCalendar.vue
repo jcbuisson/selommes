@@ -8,7 +8,7 @@
  *    - colStart / colSpan — which cells the bar occupies in that week
  *    - startsHere / endsHere — whether to round the left/right caps or leave them square for continuity across week breaks
  * 
- * Label: shown only on the first segment of a range (startsHere), with text-overflow: ellipsis for narrow bars.  
+ * Label: shown on every segment of a range, with text-overflow: ellipsis for narrow bars.
 */
 
 import { ref, computed } from 'vue'
@@ -250,7 +250,7 @@ defineExpose({ clearSelection })
             :style="barStyle(seg)"
             @mousedown.stop="onBarClick(seg)"
          >
-            <span v-if="seg.startsHere" class="bar-label">{{ seg.label }}</span>
+            <span class="bar-label">{{ seg.label }}</span>
          </div>
       </div>
    </div>
