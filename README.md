@@ -116,13 +116,8 @@ replication-slot conflicts with other applications on the same PostgreSQL server
 
 ### Configure and start the frontend
 
-Create `frontend/.env.development`:
-
-```dotenv
-VITE_SELOMMES_URL=http://localhost:8080
-```
-
-This URL is used in registration email links. Start Electric:
+Registration email links use the origin of the page opened in the browser
+(for example, `http://localhost:8080` in development). Start Electric:
 
 ```sh
 cd backend
@@ -219,11 +214,11 @@ Build the frontend with the public HTTPS origin:
 
 ```sh
 cd /srv/selommes/frontend
-VITE_SELOMMES_URL=https://calendar.example.com npm run build
+npm run build
 ```
 
-The result is `frontend/dist`. Vite environment variables are embedded at build
-time; rebuild when changing the public origin. The PWA build includes the PGlite
+The result is `frontend/dist`. Registration links automatically use the current
+browser origin. The PWA build includes the PGlite
 worker, WASM and database assets needed for offline reloads. Deploy the entire
 `dist` directory together.
 
@@ -319,7 +314,7 @@ git pull
 npm install --prefix backend
 npm install --prefix frontend
 cd frontend
-VITE_SELOMMES_URL=https://calendar.example.com npm run build
+npm run build
 cd ../backend
 NODE_ENV=production pm2 restart selommes --update-env
 ```

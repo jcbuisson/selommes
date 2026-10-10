@@ -19,7 +19,9 @@ async function onSubmit() {
       localStorage.setItem('selommes_user_uid', user.uid);
       router.push('/agenda')
    } else {
-      const html = `<a href="${import.meta.env.VITE_SELOMMES_URL}/create-user?email=${encodeURIComponent(email.value)}" style="display:inline-block;padding:10px 20px;background-color:#89b4fa;color:#1e1e2e;text-decoration:none;border-radius:6px;font-weight:600;">Cliquez ici</a> pour confirmer votre inscription au calendrier de Selommes`;
+      const confirmationUrl = new URL('/create-user', window.location.origin)
+      confirmationUrl.searchParams.set('email', email.value)
+      const html = `<a href="${confirmationUrl.href}" style="display:inline-block;padding:10px 20px;background-color:#89b4fa;color:#1e1e2e;text-decoration:none;border-radius:6px;font-weight:600;">Cliquez ici</a> pour confirmer votre inscription au calendrier de Selommes`;
       await app.service('mail').send({
          to: email.value,
          subject: "Selommes, confirmation de l'email",
