@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import express from 'express'
+// import express from 'express'
 import pg from 'pg'
 
 import { expressX } from '@jcbuisson/express-x/server'
@@ -24,7 +24,7 @@ const models = [
    {
       name: 'user',
       primaryKey: 'uid',
-      // dynamic tombstone data is necessary for this table because email is declared unique and not null
+      // per-user tombstone data is necessary because email is declared unique and not null
       tombstoneData: ({ id }) => ({
          email: `deleted-${id}@tombstone.invalid`,
          name: '',
@@ -34,7 +34,7 @@ const models = [
    {
       name: 'range',
       primaryKey: 'uid',
-      // static tombstone data here is enough
+      // static tombstone data here is ok
       tombstoneData: { start: '', end: '', label: '', color: '', user_uid: null }
    },
 ]

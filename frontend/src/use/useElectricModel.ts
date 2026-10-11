@@ -1,7 +1,16 @@
 
 export default function useElectricModel(app: any, name: string) {
 
-   const model = app.createElectricModel(name, { primaryKey: 'uid' })
+   const model = app.createElectricModel(name, {
+      primaryKey: 'uid',
+      streamOptions: {
+         // The Web Lock owner serves every tab, even when its own tab is hidden.
+         runtimeVisibility: {
+            getCurrentState: () => 'visible',
+            subscribe: () => () => {},
+         },
+      },
+   })
 
    // Authentication needs an authoritative lookup before the initial Shape arrives.
    const findMany = (where = {}) => navigator.onLine

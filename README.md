@@ -3,6 +3,10 @@
 Shared calendar built with Vue/Vite, Express-X, PostgreSQL and Electric. The Electric
 client plugin manages a persistent PGlite database and synchronization across browser tabs.
 
+Express-X plugins 5.0.3 reconciles Electric snapshots in three database queries,
+independent of row count. The shared sync owner keeps its stream active when its
+tab is hidden so visible follower tabs still receive updates.
+
 ## Admin
 ```js
 npx @jcbuisson/selommes-client user list
