@@ -46,8 +46,6 @@ await prepareElectricSyncSchema(db, models)
 app.configure(electricServerPlugin, db, models, {
    sync: true,
    electricUrl: process.env.ELECTRIC_URL,
-   // using a secret prevents other processes of localhost to access the electric service
-   sourceSecret: electricSecret,
    // TODO: add real session/ownership checks in production
    authorize: async () => true,
 })
