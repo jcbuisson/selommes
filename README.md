@@ -86,6 +86,7 @@ Create `backend/.env`:
 PORT=8000
 DATABASE_URL=postgresql://selommes:replace-with-your-password@localhost:5432/selommes
 ELECTRIC_URL=http://localhost:3217/v1/shape
+ELECTRIC_SECRET=replace-with-a-random-secret
 
 MAIL_HOST=smtp.example.com
 MAIL_PORT=587
@@ -94,6 +95,11 @@ MAIL_PASSWORD=your-smtp-password
 MAIL_DOMAIN=example.com
 MAIL_SENDER=Selommes <calendar@example.com>
 ```
+
+Generate the secret with `openssl rand -hex 32`, then put the result in
+`backend/.env` as `ELECTRIC_SECRET`. Compose and the backend read the same value.
+This protects backend-to-Electric access; the public backend still needs user
+authorization in its `authorize` callback.
 
 Use URL-encoded passwords in database URLs. The mail service uses `secure: false`;
 configure an SMTP endpoint supporting STARTTLS, typically on port 587.
@@ -186,7 +192,7 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       DATABASE_URL: ${ELECTRIC_DATABASE_URL:?Set ELECTRIC_DATABASE_URL}
-      ELECTRIC_INSECURE: "true"
+      ELECTRIC_SECRET: ${ELECTRIC_SECRET:?Set ELECTRIC_SECRET in backend/.env}
       ELECTRIC_REPLICATION_STREAM_ID: "selommes"
       ELECTRIC_STORAGE_DIR: /var/lib/electric
     ports:
@@ -199,8 +205,9 @@ volumes:
 ```
 
 This is a standalone Compose file, used instead of the development file.
-`ELECTRIC_INSECURE` is enabled because Electric is private and accessed through
-the backend proxy; do not expose its port publicly. The volume preserves its Shape
+Electric requires the same `ELECTRIC_SECRET` configured in the backend `.env`.
+The backend injects it into upstream requests; never put it in frontend variables.
+Its port is bound to localhost so requests must go through the backend proxy. The volume preserves its Shape
 cache across restarts. See [Electric's storage guidance](https://electric.ax/docs/sync/guides/deployment#configuring-storage)
 when changing database connections or storage locations.
 

@@ -6,13 +6,13 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       DATABASE_URL: postgresql://chris:eureka31@host.docker.internal:5432/selommes
-      ELECTRIC_INSECURE: "true"
+      ELECTRIC_SECRET: ${ELECTRIC_SECRET:?Set ELECTRIC_SECRET in backend/.env}
       ELECTRIC_REPLICATION_STREAM_ID: "selommes"
       ELECTRIC_STORAGE: FAST_FILE
       ELECTRIC_PERSISTENT_STATE: FILE
       ELECTRIC_STORAGE_DIR: /var/lib/electric/selommes
     ports:
-      - "3217:3000"
+      - "127.0.0.1:3217:3000"
     volumes:
       - electric_shdl_data:/var/lib/electric
 

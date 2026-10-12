@@ -11,6 +11,8 @@ import mailService from '#root/src/mail.service.js'
 // import authService from '#root/src/services/auth.service.js'
 import publish from '#root/src/publish.js'
 
+const electricSecret = process.env.ELECTRIC_SECRET?.trim()
+if (!electricSecret) throw new Error('ELECTRIC_SECRET is required to connect to Electric')
 
 const app = expressX({
    WS_TRANSPORT: true,
@@ -44,6 +46,8 @@ await prepareElectricSyncSchema(db, models)
 app.configure(electricServerPlugin, db, models, {
    sync: true,
    electricUrl: process.env.ELECTRIC_URL,
+   // using a secret prevents other processes of localhost to access the electric service
+   sourceSecret: electricSecret,
    // TODO: add real session/ownership checks in production
    authorize: async () => true,
 })
