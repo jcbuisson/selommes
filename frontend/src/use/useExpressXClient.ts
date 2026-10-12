@@ -64,6 +64,7 @@ export default function useExpressXClient() {
 }
 
 if (import.meta.hot) {
+   // clean up connections when Vite replaces this module after a code edit during development.
    import.meta.hot.dispose(() => {
       void app?.disposeElectricSync()
       socket?.disconnect()

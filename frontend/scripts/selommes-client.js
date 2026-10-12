@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 // npx @jcbuisson/selommes-client user list
+// npx @jcbuisson/selommes-client user delete --uid <user-uid>
+// npx @jcbuisson/selommes-client user --help
 // npx @jcbuisson/selommes-client range list
 // npx @jcbuisson/selommes-client range --help
 
