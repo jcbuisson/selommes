@@ -46,6 +46,7 @@ await prepareElectricSyncSchema(db, models)
 app.configure(electricServerPlugin, db, models, {
    sync: true,
    electricUrl: process.env.ELECTRIC_URL,
+   sourceSecret: electricSecret,
    // TODO: add real session/ownership checks in production
    authorize: async () => true,
 })

@@ -1,72 +1,79 @@
-import { io, Socket } from "socket.io-client";
+import { io } from 'socket.io-client'
 import { createClient } from '@jcbuisson/express-x/client'
-// import { reloadPlugin } from '@jcbuisson/express-x-plugins/reload-client'
 import { electricClientPlugin } from '@jcbuisson/express-x-plugins/electric-client'
+import { reactive, readonly } from 'vue'
 
-// import { setExpiresAt } from "/src/use/useAppState"
-// import { useAuthentication } from "/src/use/useAuthentication"
+function createExpressXClient() {
+   const state = reactive({
+      socketConnected: false,
+      socketError: null as Error | null,
+      // Last reported error per model; current queue status is model.getStatus().
+      syncErrors: {} as Record<string, Error>,
+   })
+   const socket = io({
+      path: '/selommes-socket-io/',
+      transports: ['websocket'],
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 10000,
+      autoConnect: false,
+   })
+   const app = createClient(socket, { debug: import.meta.env.DEV })
 
-
-let socket: Socket | null = null;
-let app: any = null;
-
-const socketOptions = {
-   path: '/selommes-socket-io/',
-   transports: ["websocket"],
-   reconnectionDelay: 1000,
-   reconnectionDelayMax: 10000,
-};
-
-export default function useExpressXClient() {
-   if (!app) {
-      socket = io(socketOptions);
-      app = createClient(socket, { debug: false });
-
-      app.configure(electricClientPlugin, {
-         sync: true,
-         databaseName: 'selommes-sync',
-         onError: (error: unknown, { modelName }: { modelName: string }) => {
-            console.error(`Electric sync failed for ${modelName}`, error)
-         },
-         // Electric's client constructs a URL directly, so it requires an absolute URL.
-         shapePath: new URL('/electric/v1/shape', window.location.origin).href,
-      })
-
-      // // reload plugin: handles cnx-transfer on page reload (persists socket id in sessionStorage)
-      // reloadPlugin(app);
-
-      // const { restartApp } = useAuthentication(app);
-
-      app.addErrorListener((socket: Socket, err: unknown) => {
-         console.log('CNX ERROR!!!', socket.id, err)
-      })
-
-      // socket.on('expiresAt', async (expiresAt: unknown) => {
-      //    console.log("server sent 'expiresAt' event", expiresAt)
-      //    setExpiresAt(expiresAt)
-      //    if (!expiresAt) {
-      //       await restartApp()
-      //    }
-      // })
-
-      app.connect = () => {
-         console.log('connecting...')
-         socket && socket.connect()
-      }
-
-      app.disconnect = () => {
-         console.log('disconnecting...')
-         socket && socket.disconnect()
+   function reportSyncError(cause: unknown, { modelName }: { modelName: string }) {
+      const error = cause instanceof Error ? cause : new Error(String(cause))
+      const previous = state.syncErrors[modelName]
+      state.syncErrors[modelName] = error
+      // Keep storage and initialization failures visible, including while offline.
+      if (previous?.message !== error.message) {
+         console.error(`Electric sync failed for ${modelName}`, error)
       }
    }
 
-   return { app };
+   app.configure(electricClientPlugin, {
+      sync: true,
+      databaseName: 'selommes-sync',
+      shapePath: new URL(
+         import.meta.env.VITE_ELECTRIC_URL || '/electric/v1/shape',
+         window.location.origin,
+      ).href,
+      onError: reportSyncError,
+   })
+
+   socket.on('connect', () => {
+      state.socketConnected = true
+      state.socketError = null
+   })
+   socket.on('disconnect', () => { state.socketConnected = false })
+   socket.on('connect_error', (error: Error) => {
+      state.socketConnected = false
+      state.socketError = error
+   })
+
+   // These controls affect RPC transport; Electric sync has its own connection.
+   const connectSocket = () => socket.connect()
+   const disconnectSocket = () => socket.disconnect()
+
+   let disposal: Promise<void> | undefined
+   function dispose() {
+      if (disposal) return disposal
+      socket.disconnect()
+      socket.removeAllListeners()
+      disposal = Promise.resolve().then(() => app.disposeElectricSync())
+      return disposal
+   }
+
+   socket.connect()
+   return { app, socket, state: readonly(state), connectSocket, disconnectSocket, dispose }
+}
+
+let client: ReturnType<typeof createExpressXClient> | undefined
+
+export default function useExpressXClient() {
+   return client ??= createExpressXClient()
 }
 
 if (import.meta.hot) {
-   // clean up connections when Vite replaces this module after a code edit during development.
    import.meta.hot.dispose(() => {
-      void app?.disposeElectricSync()
-      socket?.disconnect()
+      void client?.dispose().catch(error => console.error('Client cleanup failed', error))
    })
 }
