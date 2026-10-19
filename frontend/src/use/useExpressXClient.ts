@@ -1,6 +1,7 @@
 import { io } from 'socket.io-client'
 import { createClient } from '@jcbuisson/express-x/client'
 import { electricClientPlugin } from '@jcbuisson/express-x-plugins/electric-client'
+import { reloadPlugin } from '@jcbuisson/express-x-plugins/reload-client'
 import { reactive, readonly } from 'vue'
 
 function createExpressXClient() {
@@ -18,6 +19,7 @@ function createExpressXClient() {
       autoConnect: false,
    })
    const app = createClient(socket, { debug: import.meta.env.DEV })
+   app.configure(reloadPlugin)
 
    function reportSyncError(cause: unknown, { modelName }: { modelName: string }) {
       const error = cause instanceof Error ? cause : new Error(String(cause))
