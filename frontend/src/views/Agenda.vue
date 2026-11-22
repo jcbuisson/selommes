@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { useObservable } from '@vueuse/rxjs'
 import { mdiPlus } from '@mdi/js'
 import { useLocalStorage } from '@vueuse/core'
@@ -12,23 +13,21 @@ import useUser from '/src/use/useUser';
 import useExpressXClient from '/src/use/useExpressXClient.ts';
 
 const { app } = useExpressXClient()
+const router = useRouter()
 const { getObservable: ranges$, create: createRange, update: updateRange, remove: removeRange } = useRange(app);
-const { getObservable: users$ } = useUser(app);
+const { getObservable: users$, findUnique: findUser } = useUser(app);
 
 const ranges = useObservable(ranges$({}))
 
 const currentUserUid = useLocalStorage('selommes_user_uid');
-const usersUid = useObservable(users$({ uid: currentUserUid?.value }));
+const users = useObservable(users$({}));
 
-const currentUserX = computed(() => {
-   if (!currentUserUid.value) return
-   if (!usersUid.value?.length) return
-   return usersUid.value[0]
-})
+const currentUserX = computed(() => users.value?.find(user => user.uid === currentUserUid.value))
 
 const showModal = ref(false)
 const pendingRangeDate = ref(null)
 const rangeConfirmationRef = ref(null)
+const missingProfileDialogRef = ref(null)
 const labelInput = ref('')
 const startDateInput = ref('')
 const endDateInput = ref('')
@@ -37,6 +36,7 @@ const rangeDialogMode = ref('create')
 const editingRangeUid = ref(null)
 const selectedRangeUid = ref(null)
 const calendarRef = ref(null)
+const savingRange = ref(false)
 
 function formatDateInput(date) {
    const year = date.getFullYear()
@@ -74,15 +74,24 @@ function resetRangeDialog() {
 }
 
 async function createCurrentUserRange(start, end) {
-   const user = currentUserX.value
-   if (!user) throw new Error('Votre profil est en cours de chargement. Réessayez dans quelques instants.')
-   return createRange({
+   const uid = currentUserUid.value
+   if (!uid) throw new Error('Reconnectez-vous pour créer une plage.')
+   const user = currentUserX.value ?? (navigator.onLine ? await findUser({ uid }) : null)
+   if (uid !== currentUserUid.value) throw new Error('Votre profil a changé. Réessayez.')
+   if (!user) {
+      if (!navigator.onLine) throw new Error('Votre profil est indisponible hors connexion.')
+      resetRangeDialog()
+      missingProfileDialogRef.value?.showModal()
+      return false
+   }
+   await createRange({
       label: labelInput.value.trim() || user.name,
       color: user.color,
       start: serializeDate(start),
       end: serializeDate(end),
       user_uid: user.uid,
    })
+   return true
 }
 
 async function updateRangeDates(uid, start, end) {
@@ -140,6 +149,8 @@ function openCreateDialog(date = new Date()) {
 }
 
 async function confirmCreate() {
+   if (savingRange.value) return
+   savingRange.value = true
    rangeFormError.value = ''
    try {
       const label = labelInput.value.trim()
@@ -157,12 +168,14 @@ async function confirmCreate() {
       if (rangeDialogMode.value === 'edit' && editingRangeUid.value) {
          const uid = editingRangeUid.value
          await updateRangeDates(uid, start, end)
-      } else {
-         await createCurrentUserRange(start, end)
+      } else if (!await createCurrentUserRange(start, end)) {
+         return
       }
       resetRangeDialog()
    } catch (error) {
       rangeFormError.value = error.message || 'Impossible de creer la plage'
+   } finally {
+      savingRange.value = false
    }
 }
 
@@ -254,6 +267,18 @@ async function onUpdateRange({ uid, start, end }) {
       <p v-if="rangeFormError && !showModal" class="modal-error" role="alert">{{ rangeFormError }}</p>
 
       <dialog
+         ref="missingProfileDialogRef"
+         class="modal range-confirmation"
+         aria-labelledby="missing-profile-message"
+         @cancel.prevent
+      >
+         <p id="missing-profile-message" class="modal-label">Profil introuvable. Reconnectez-vous pour créer une plage.</p>
+         <div class="modal-actions">
+            <button class="modal-btn confirm" autofocus @click="router.push('/auth')">Se reconnecter</button>
+         </div>
+      </dialog>
+
+      <dialog
          v-if="pendingRangeDate"
          ref="rangeConfirmationRef"
          class="modal range-confirmation"
@@ -318,7 +343,7 @@ async function onUpdateRange({ uid, start, end }) {
             <div class="modal-actions">
                <button v-if="rangeDialogMode === 'edit'" class="modal-btn danger" @click="deleteEditingRange">Supprimer</button>
                <button class="modal-btn cancel" @click="cancelCreate">{{ rangeDialogMode === 'view' ? 'Fermer' : 'Annuler' }}</button>
-               <button v-if="rangeDialogMode !== 'view'" class="modal-btn confirm" :disabled="!labelInput.trim() || !startDateInput || !endDateInput" @click="confirmCreate">
+               <button v-if="rangeDialogMode !== 'view'" class="modal-btn confirm" :disabled="savingRange || !labelInput.trim() || !startDateInput || !endDateInput" @click="confirmCreate">
                   {{ rangeDialogMode === 'edit' ? 'Enregistrer' : 'Créer' }}
                </button>
             </div>
@@ -432,6 +457,10 @@ async function onUpdateRange({ uid, start, end }) {
 
 .range-confirmation::backdrop {
    background: rgba(0, 0, 0, 0.5);
+}
+
+dialog.modal:not([open]) {
+   display: none;
 }
 
 .modal-label {

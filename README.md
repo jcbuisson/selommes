@@ -50,7 +50,6 @@ ALTER ROLE chris WITH REPLICATION;
 (restart postgres)
 ```
 
-
 ```sql
 CREATE TABLE "user" (
    uid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -70,10 +69,11 @@ CREATE TABLE "range" (
 ```
 
 These commands are for a new database; keep existing tables and data when upgrading.
-At startup, the backend adds the sync `version` and `deleted` columns, mutation
-cursor table and version sequence. It also adjusts the user email constraint for
-deleted rows. The backend database role therefore needs permission to alter these
-tables.
+At startup, the backend adds:
+  - the sync `version` and `deleted` columns to each business table
+  - the 'electric_mutation_cursor' table and 'electric_sync_version_seq' version sequence
+It also adjusts the user email constraint for deleted rows.
+The backend database role therefore needs permission to alter these tables.
 
 See the [Electric deployment guide](https://electric.ax/docs/sync/guides/deployment)
 for PostgreSQL replication and connection requirements.
